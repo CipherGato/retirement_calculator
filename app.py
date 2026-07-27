@@ -26,8 +26,26 @@ if 'cfg' not in st.session_state:
     else:
         st.session_state.cfg = {}
 
+
+# --- GLOBAL CONSTANTS ---
+sim_models = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
+
+drawdown_options = [
+    "Equities First",
+    "Equities First (401k First)",
+    "Tax-Optimised (Cap at Basic Rate, Protect Cash)",
+    "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"
+]
+
+dc_options = [
+    "100% Taxable (Already taken / Default)",
+    "UFPLS (25% Tax-Free per withdrawal)",
+    "Phased PCLS (Move £20k/yr Tax-Free to S&S ISA)"
+]
+
+
 # --- Import & Export ---
-with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
+with st.sidebar.expander("7. Save & Load Scenarios", expanded=False):
     st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
     if st.button("🔗 Generate Bookmark Link", help="Updates the URL with your current settings so you can bookmark or share it."):
         b64_str = base64.urlsafe_b64encode(json.dumps(st.session_state.cfg).encode("utf-8")).decode("utf-8").rstrip("=")
@@ -567,7 +585,6 @@ with st.sidebar:
         gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 0), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
         
     with st.expander("6. Market Assumptions", expanded=False):
-        sim_models = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
         sim_model_index = get_val('sim_model_index', 0)
         if sim_model_index >= len(sim_models): sim_model_index = 0
         sim_model = st.selectbox("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
@@ -649,9 +666,7 @@ with open("debug_log.txt", "a") as f: f.write(f"\n--- RUN {time.time()} ---\nCFG
 if st.session_state.cfg != st.session_state.cfg:
     st.session_state.cfg = st.session_state.cfg
 
-with st.sidebar.expander("🛠 DEBUG STATE", expanded=False):
-    st.write("Widget keys:", [k for k in st.session_state.keys() if k.endswith("_widget")])
-    st.write("CFG:", st.session_state.cfg)
+
 
 
 # FIX #13: Validate age range
