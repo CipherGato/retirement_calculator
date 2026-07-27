@@ -26,6 +26,54 @@ if 'cfg' not in st.session_state:
     else:
         st.session_state.cfg = {}
 
+# --- Import & Export (Must run before widgets are instantiated) ---
+with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
+    st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
+    if st.button("🔗 Generate Bookmark Link", help="Updates the URL with your current settings so you can bookmark or share it."):
+        b64_str = base64.urlsafe_b64encode(json.dumps(st.session_state.cfg).encode("utf-8")).decode("utf-8").rstrip("=")
+        st.query_params["state"] = b64_str
+        st.success("URL updated! You can now bookmark or copy the URL.")
+    
+    st.write("---")
+    st.write("Or, export/import to a file:")
+    json_to_export = json.dumps(st.session_state.cfg, indent=2)
+    
+    st.download_button(
+        label="📥 Export Settings (JSON)",
+        data=json_to_export,
+        file_name="retirement_settings.json",
+        mime="application/json"
+    )
+    
+    uploaded_file = st.file_uploader("📤 Import Settings (JSON)", type=["json"])
+    if uploaded_file is not None:
+        if st.button("Apply Imported Settings"):
+            try:
+                # Seek to 0 in case it was read before
+                uploaded_file.seek(0)
+                imported_cfg = json.load(uploaded_file)
+                st.session_state.cfg = imported_cfg
+                
+                # Inject imported values directly into session state to force Streamlit to adopt them
+                for k, v in imported_cfg.items():
+                    if k == "drawdown_strategy_index":
+                        st.session_state["drawdown_strategy_widget"] = ["Equities First", "Equities First (401k First)", "Tax-Optimised (Cap at Basic Rate, Protect Cash)", "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"][min(v, 3)]
+                    elif k == "sim_model_index":
+                        st.session_state["sim_model_widget"] = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"][min(v, 2)]
+                    elif k == "dc_tax_free_index":
+                        st.session_state["dc_tax_free_widget"] = ["100% Taxable (Already taken / Default)", "UFPLS (25% Tax-Free per withdrawal)", "Phased PCLS (Move £20k/yr Tax-Free to S&S ISA)"][min(v, 2)]
+                    else:
+                        st.session_state[f"{k}_widget"] = v
+                
+                # Do not set the massive URL on import to prevent websocket disconnects
+                # Instead, clear any existing long URL to ensure stability
+                st.query_params.clear()
+                
+                st.success("Settings imported successfully!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to load: {e}")
+
 def get_val(key, default):
     return st.session_state.cfg.get(key, default)
 
@@ -602,436 +650,3 @@ with open("debug_log.txt", "a") as f: f.write(f"\n--- RUN {time.time()} ---\nCFG
 if new_cfg != st.session_state.cfg:
     st.session_state.cfg = new_cfg
 
-with st.sidebar.expander("🛠 DEBUG STATE", expanded=False):
-    st.write("Widget keys:", [k for k in st.session_state.keys() if k.endswith("_widget")])
-    st.write("CFG:", st.session_state.cfg)
-
-with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
-    st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
-    if st.button("🔗 Generate Bookmark Link", help="Updates the URL with your current settings so you can bookmark or share it."):
-        b64_str = base64.urlsafe_b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
-        st.query_params["state"] = b64_str
-        st.success("URL updated! You can now bookmark or copy the URL.")
-    
-    st.write("---")
-    st.write("Or, export/import to a file:")
-    json_to_export = json.dumps(new_cfg, indent=2)
-    st.download_button("📥 Export Settings (JSON)", data=json_to_export, file_name="retirement_scenario.json", mime="application/json")
-    
-    uploaded_file = st.file_uploader("📤 Import Settings (JSON)", type=["json"])
-    if uploaded_file is not None:
-        if st.button("Apply Imported Settings"):
-            try:
-                # Seek to 0 in case it was read before
-                uploaded_file.seek(0)
-                imported_cfg = json.load(uploaded_file)
-                st.session_state.cfg = imported_cfg
-                
-                # Inject imported values directly into session state to force Streamlit to adopt them
-                for k, v in imported_cfg.items():
-                    if k == "drawdown_strategy_index":
-                        st.session_state["drawdown_strategy_widget"] = drawdown_options[min(v, len(drawdown_options)-1)]
-                    elif k == "sim_model_index":
-                        st.session_state["sim_model_widget"] = sim_models[min(v, len(sim_models)-1)]
-                    elif k == "dc_tax_free_index":
-                        st.session_state["dc_tax_free_widget"] = dc_options[min(v, len(dc_options)-1)]
-                    else:
-                        st.session_state[f"{k}_widget"] = v
-                
-                # Do not set the massive URL on import to prevent websocket disconnects
-                # Instead, clear any existing long URL to ensure stability
-                st.query_params.clear()
-                
-                st.success("Settings imported successfully!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to load: {e}")
-
-# FIX #13: Validate age range
-if current_age >= end_age:
-    st.error("Current Age must be less than End Age (Life Expectancy).")
-    st.stop()
-
-inputs = {
-    'current_age': current_age,
-    'end_age': end_age,
-    'spending_points': spending_points,
-    'inflation_rate': inflation_rate,
-    'tax_band_inflation': tax_band_inflation,
-    'usd_gbp_rate': usd_gbp_rate,
-    'state_pension': state_pension,
-    'state_pension_age': state_pension_age,
-    'db_pension': db_pension,
-    'db_age': db_age,
-    'sp_inflation': state_pension_inflation_pct / 100.0,
-    'db_inflation': db_pension_inflation_pct / 100.0,
-    'savings_start': savings_start,
-    'cash_isa_start': cash_isa_start,
-    'ss_isa_start': ss_isa_start,
-    'gia_start': gia_start,
-    'dc_start': dc_start,
-    'k401_start_usd': k401_start_usd,
-    'k401_access_age': k401_access_age,
-    'equity_allocation': equity_allocation_pct / 100.0,
-    'cash_interest': cash_interest,
-    'drawdown_strategy': drawdown_strategy,
-    'dc_tax_free_method': dc_tax_free_method,
-    'lsa_start': lsa_start,
-    'cash_buffer_years': cash_buffer_years
-}
-
-with tab_sim:
-    with st.spinner(f"Running {sim_count} simulations..."):
-        all_results = []
-        years = end_age - current_age + 1
-        
-        HISTORICAL_RETURNS_SP500 = np.array([
-            0.4381, -0.0830, -0.2512, -0.4384, -0.0864, 0.4998, -0.0119, 0.4674, 0.3194, -0.3534,
-            0.2928, -0.0110, -0.1067, -0.1277, 0.1917, 0.2506, 0.1903, 0.3582, -0.1187, 0.0520,
-            0.0570, 0.1830, 0.3081, 0.2368, 0.1815, -0.0121, 0.5256, 0.3260, 0.0744, -0.1046,
-            0.4372, 0.1206, 0.0034, 0.2664, -0.0881, 0.2261, 0.1642, 0.1242, -0.0997, 0.2368,
-            0.1081, -0.0824, 0.0356, 0.1422, 0.1876, -0.1431, -0.2590, 0.3700, 0.2383, -0.0698,
-            0.0656, 0.1844, 0.3250, -0.0491, 0.2155, 0.2256, 0.0627, 0.3173, 0.1867, 0.0525,
-            0.1661, 0.3169, -0.0310, 0.3047, 0.0762, 0.1008, 0.0132, 0.3758, 0.2296, 0.3336,
-            0.2858, 0.2104, -0.0910, -0.1189, -0.2210, 0.2868, 0.1088, 0.0491, 0.1579, 0.0549,
-            -0.3700, 0.2646, 0.1506, 0.0211, 0.1600, 0.3239, 0.1369, 0.0138, 0.1196, 0.2183,
-            -0.0438, 0.3149, 0.1840, 0.2871, -0.1811, 0.2629
-        ])
-        
-        HISTORICAL_RETURNS_FTSE = np.array([
-            0.2563, 0.0799, 0.0998, 0.3351, -0.1081, 0.1856, 0.1833, 0.2684, -0.0605, 0.2201, 
-            0.1518, 0.2323, 0.1441, 0.2475, -0.0447, -0.1191, -0.2147, 0.2007, 0.1271, 0.216, 
-            0.1665, 0.0553, -0.2928, 0.2846, 0.1444, -0.0319, 0.1174, 0.2019, 0.0137, 0.01, 
-            0.1595, 0.125, -0.0945, 0.1769, -0.0896, 0.1805, 0.0034, 0.0735
-        ])
-        
-        if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
-            hist_mean = np.prod(1 + HISTORICAL_RETURNS_SP500) ** (1 / len(HISTORICAL_RETURNS_SP500)) - 1
-            median_returns = np.full(years, hist_mean)
-        elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
-            hist_mean = np.prod(1 + HISTORICAL_RETURNS_FTSE) ** (1 / len(HISTORICAL_RETURNS_FTSE)) - 1
-            median_returns = np.full(years, hist_mean)
-        else:
-            median_returns = np.full(years, market_mean)
-            
-        df_median = simulate_scenario(inputs, median_returns)
-        
-        np.random.seed(42)
-        success_count = 0
-        final_pots = []
-        
-        for sim in range(sim_count):
-            if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
-                start_idx = sim
-                returns = np.array([HISTORICAL_RETURNS_SP500[(start_idx + i) % len(HISTORICAL_RETURNS_SP500)] for i in range(years)])
-            elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
-                start_idx = sim
-                returns = np.array([HISTORICAL_RETURNS_FTSE[(start_idx + i) % len(HISTORICAL_RETURNS_FTSE)] for i in range(years)])
-            else:
-                returns = np.random.normal(market_mean, market_vol, years)
-                
-            df = simulate_scenario(inputs, returns)
-            df['Simulation'] = sim
-            all_results.append(df)
-            
-            final_pot = df['Total Pot'].iloc[-1]
-            final_pots.append(final_pot)
-            if final_pot > 0:
-                success_count += 1
-                
-        df_all = pd.concat(all_results)
-        failure_rate = ((sim_count - success_count) / sim_count) * 100
-        
-        final_inflation_factor = (1 + inputs['inflation_rate']) ** years
-        final_pots_real = [p / final_inflation_factor for p in final_pots]
-        
-        p10 = np.percentile(final_pots_real, 10)
-        p50 = np.percentile(final_pots_real, 50)
-        p90 = np.percentile(final_pots_real, 90)
-        
-        ages = df_all['Age'].unique()
-        p10_series = df_all.groupby('Age')['Total Pot'].quantile(0.10).values
-        p25_series = df_all.groupby('Age')['Total Pot'].quantile(0.25).values
-        p50_series = df_all.groupby('Age')['Total Pot'].quantile(0.50).values
-        p75_series = df_all.groupby('Age')['Total Pot'].quantile(0.75).values
-        p90_series = df_all.groupby('Age')['Total Pot'].quantile(0.90).values
-        
-    st.subheader("Monte Carlo Simulation Results")
-    
-    failures_df = df_all[df_all['Total Pot'] < 1.0]
-    earliest_fail_age = failures_df['Age'].min() if not failures_df.empty else None
-    
-    col1, col2, col3, col4 = st.columns(4)
-    if earliest_fail_age is not None:
-        col1.metric("Failure Rate (Pot depleted)", f"{failure_rate:.1f}%", f"Earliest: Age {earliest_fail_age}", delta_color="inverse")
-    else:
-        col1.metric("Failure Rate (Pot depleted)", f"{failure_rate:.1f}%", "100% Success Rate", delta_color="normal")
-        
-    col2.metric("Median Final Pot (Today's £)", f"£{p50:,.0f}")
-    col3.metric("Pessimistic Final (10th %ile)", f"£{max(0, p10):,.0f}")
-    col4.metric("Optimistic Final (90th %ile)", f"£{p90:,.0f}")
-    
-    st.write("👆 **Click on any line in the graph below** to load its exact year-by-year breakdown beneath it!")
-    
-    fig = go.Figure()
-    
-    # 10th-90th Percentile Band
-    fig.add_trace(go.Scatter(
-        x=ages, y=p10_series, mode='lines', line=dict(width=0), showlegend=False, hoverinfo="skip"
-    ))
-    fig.add_trace(go.Scatter(
-        x=ages, y=p90_series, mode='lines', fill='tonexty', fillcolor='rgba(0, 200, 150, 0.15)', line=dict(width=0), name='10th - 90th Percentile (Likely)'
-    ))
-    
-    # 25th-75th Percentile Band
-    fig.add_trace(go.Scatter(
-        x=ages, y=p25_series, mode='lines', line=dict(width=0), showlegend=False, hoverinfo="skip"
-    ))
-    fig.add_trace(go.Scatter(
-        x=ages, y=p75_series, mode='lines', fill='tonexty', fillcolor='rgba(0, 200, 150, 0.3)', line=dict(width=0), name='25th - 75th Percentile (Most Likely)'
-    ))
-    
-    # Median Line
-    fig.add_trace(go.Scatter(
-        x=ages, y=p50_series, mode='lines', line=dict(color='rgba(0, 150, 100, 1)', width=2, dash='dash'), name='Median Path'
-    ))
-    
-    # FIX #7: Spread clickable paths evenly across ALL simulations, not just the first 50
-    max_plotted = min(50, sim_count)
-    if sim_count <= 50:
-        plotted_sims = list(range(sim_count))
-    else:
-        step = sim_count / max_plotted
-        plotted_sims = [int(i * step) for i in range(max_plotted)]
-    
-    for sim in plotted_sims:
-        df_sim = df_all[df_all['Simulation'] == sim]
-        if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
-            name = f"Retiring in {1928 + sim}"
-        elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
-            name = f"Retiring in {1986 + sim}"
-        else:
-            name = f"Simulation {sim}"
-        fig.add_trace(go.Scatter(
-            x=df_sim['Age'], y=df_sim['Total Pot'], mode='lines+markers', name=name, customdata=np.full(len(df_sim), sim),
-            line=dict(color='rgba(0,0,255,0.05)' if sim_count > 50 else 'rgba(0,0,255,0.1)'), 
-            marker=dict(size=12, opacity=0),
-            showlegend=False
-        ))
-    
-    # FIX #9: Use a distinct sentinel (-999) for the deterministic path so clicking it works
-    DETERMINISTIC_SENTINEL = -999
-    fig.add_trace(go.Scatter(
-        x=df_median['Age'], y=df_median['Total Pot'], mode='lines+markers', name='Deterministic Path (Constant Return)',
-        customdata=np.full(len(df_median), DETERMINISTIC_SENTINEL), line=dict(color='red', width=3),
-        marker=dict(size=1, opacity=0)
-    ))
-    
-    fig.add_hline(
-        y=0, line_dash="dash", line_color="red", line_width=2,
-        annotation_text="Failure Zone (Pot Depleted)", annotation_position="bottom right"
-    )
-    
-    fig.update_layout(
-        title='Total Pot Balance Over Time (Probability Cone + Clickable Paths)', xaxis_title='Age', yaxis_title='Total Pot (£)',
-        yaxis_tickformat='£,.0f', clickmode='event+select', hovermode='closest'
-    )
-    
-    selection = st.plotly_chart(fig, use_container_width=True, on_select="rerun", selection_mode="points")
-    
-    sim_to_inspect = None
-    if selection and "selection" in selection and "points" in selection["selection"]:
-        points = selection["selection"]["points"]
-        if len(points) > 0:
-            custom_data = points[0].get("customdata")
-            if custom_data is not None:
-                sim_to_inspect = custom_data[0] if isinstance(custom_data, list) else custom_data
-    
-    st.subheader("Deep Dive: Selected Run Breakdown")
-    
-    # FIX #8 & #9: Handle deterministic sentinel, empty DataFrames, and no-click state
-    if sim_to_inspect is not None and sim_to_inspect == DETERMINISTIC_SENTINEL:
-        df_to_show = df_median
-        st.write("Showing the **Deterministic Path** (constant expected return each year).")
-    elif sim_to_inspect is not None and sim_to_inspect >= 0:
-        # FIX #14: Specific exception types instead of bare except
-        try:
-            sim_id = int(sim_to_inspect)
-            df_to_show = df_all[df_all['Simulation'] == sim_id].copy()
-            # FIX #8: Guard against empty DataFrame
-            if df_to_show.empty:
-                df_to_show = df_median
-                st.warning(f"Simulation {sim_id} is not in the plotted set. Showing deterministic path instead.")
-            elif sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
-                st.write(f"Showing exact year-by-year drawdown for a retirement starting in **{1928 + sim_id}**.")
-            elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
-                st.write(f"Showing exact year-by-year drawdown for a retirement starting in **{1986 + sim_id}**.")
-            else:
-                st.write(f"Showing exact year-by-year drawdown for **Monte Carlo Simulation {sim_id}**.")
-        except (ValueError, KeyError, IndexError):
-            df_to_show = df_median
-            st.write("Showing the deterministic path.")
-    else:
-        df_to_show = df_median
-        st.write("Showing the exact year-by-year drawdown logic applied using the constant expected return. Click a line above to inspect a specific simulation.")
-    
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        fig_inc = go.Figure()
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Guaranteed'], mode='lines', stackgroup='one', name='Guaranteed (DB + State)'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Savings'], mode='lines', stackgroup='one', name='Savings (Cash)'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Cash ISA'], mode='lines', stackgroup='one', name='Cash ISA'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: S&S ISA'], mode='lines', stackgroup='one', name='S&S ISA'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: GIA'], mode='lines', stackgroup='one', name='GIA'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: 401k (Net)'], mode='lines', stackgroup='one', name='US 401k (Net)'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: DC Pension (Net)'], mode='lines', stackgroup='one', name='DC Pension (Net)'))
-        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Target Net Income'], mode='lines', name='Target Need', line=dict(color='red', dash='dash')))
-        fig_inc.update_layout(title='Where is the Net Income Coming From?', xaxis_title='Age', yaxis_title='Income (£)', legend=dict(orientation="h", y=-0.2))
-        st.plotly_chart(fig_inc, use_container_width=True)
-    
-    with col2:
-        fig_ret = go.Figure()
-        x_labels = df_to_show['Age']
-        if sim_to_inspect is not None and sim_to_inspect >= 0:
-            if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
-                start_year = 1928 + int(sim_to_inspect)
-                x_labels = [f"Age {a} ({start_year + i})" for i, a in enumerate(df_to_show['Age'])]
-            elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
-                start_year = 1986 + int(sim_to_inspect)
-                x_labels = [f"Age {a} ({start_year + i})" for i, a in enumerate(df_to_show['Age'])]
-            
-        fig_ret.add_trace(go.Bar(
-            x=x_labels, y=df_to_show['Stock Market Return'], name='Stock Market (Raw)', marker_color='rgba(150, 150, 150, 0.4)'
-        ))
-        fig_ret.add_trace(go.Bar(
-            x=x_labels, y=df_to_show['Blended Portfolio Return'], name='Your Blended Portfolio', marker_color=['#00CC96' if r >= 0 else '#EF553B' for r in df_to_show['Blended Portfolio Return']]
-        ))
-        fig_ret.update_layout(
-            title='Raw Stock Market vs Your Blended Portfolio', xaxis_title='Age (and Year)', yaxis_title='Return (%)',
-            yaxis_tickformat='.1%', barmode='group', legend=dict(orientation="h", y=-0.2)
-        )
-        st.plotly_chart(fig_ret, use_container_width=True)
-    
-    st.write("---")
-    
-    fig_bal = go.Figure()
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Savings Balance'], mode='lines', stackgroup='one', name='Savings (Cash)'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Cash ISA Balance'], mode='lines', stackgroup='one', name='Cash ISA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['S&S ISA Balance'], mode='lines', stackgroup='one', name='S&S ISA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['GIA Balance'], mode='lines', stackgroup='one', name='GIA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['401k Balance (GBP)'], mode='lines', stackgroup='one', name='US 401k'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['DC Pension Balance'], mode='lines', stackgroup='one', name='DC Pension'))
-    fig_bal.update_layout(
-        title='Remaining Pot Balances Over Time', xaxis_title='Age', yaxis_title='Balance (£)',
-        yaxis_tickformat='£,.0f', legend=dict(orientation="h", y=-0.2)
-    )
-    st.plotly_chart(fig_bal, use_container_width=True)
-    
-    format_dict = {col: "£{:,.0f}" for col in df_to_show.columns if col not in ['Age', 'Simulation', 'Stock Market Return', 'Blended Portfolio Return']}
-    format_dict['Stock Market Return'] = "{:.2%}"
-    format_dict['Blended Portfolio Return'] = "{:.2%}"
-    st.dataframe(df_to_show.drop(columns=['Simulation'], errors='ignore').style.format(format_dict))
-
-with tab_help:
-    st.header("How to use this Simulator")
-    st.markdown("""
-    Welcome to the Scottish Retirement Simulator. This tool mathematically models your exact lifetime tax burden (specifically for Scotland), sequence-of-returns risk, and drawdown strategy.
-
-    ### 1. The 'Retirement Smile' (Income Goals)
-    People typically spend more in their early, active retirement years (travel, hobbies) and less later in life. Both of these targets are expressed in **Today's Money**; the simulator will automatically adjust your actual required withdrawals upwards every year to account for inflation.
-    * **Target Net Income Active Years (Today's £)**: The spending money you want in your pocket after all taxes are paid during your active years.
-    * **Active Years End Age**: The age you expect to slow down. The simulator will automatically drop your target income after this age.
-    * **Target Net Income Later Years (Today's £)**: The spending money you want in your pocket after all taxes are paid during your later years.
-
-    ### 2. Market Assumptions & Strategy
-    * **Portfolio Equity Allocation**: A 100% allocation means your 401k, Pensions, and ISAs are fully exposed to the volatile Stock Market. A 60% allocation means 60% is in Stocks, and 40% is shielded in safe Cash/Bonds (earning the Cash Yield rate you select).
-    * **Fiscal Drag (Tax Band Inflation)**: If you set this lower than General Inflation, the Scottish tax brackets won't keep up with your income needs, meaning you will quietly pay more and more tax over time (fiscal drag). Note: the £100k Personal Allowance taper threshold is always frozen (matching real UK policy since 2010).
-
-    ### 3. Simulation Models
-    * **Normal Distribution (Bell Curve)**: Uses a standard random walk based on the Mean and Volatility you provide. This is a standard Monte Carlo.
-    * **Historical Rolling Sequence (US S&P 500 1928-2023)**: Uses 96 years of ACTUAL US S&P 500 total returns (including dividends). This perfectly models **"Sequence of Returns Risk"** because it tests your retirement against the Great Depression, the 1970s stagflation, the Dot-Com crash, and the 2008 Financial Crisis in exact chronological order.
-    * **Historical Rolling Sequence (UK FTSE All-Share 1986-2023)**: Uses 38 years of historical UK FTSE All-Share index returns (price change plus an estimated 3.5% historical average dividend yield) from 1986 through 2023. Models UK-specific sequence of returns risk including the Dot-Com bubble and the Global Financial Crisis.
-
-    ### 4. Drawdown Strategies Detailed Breakdown
-    * **1. Tax-Optimised (Cap at Basic Rate, Protect Cash)** *(Recommended Default)*:
-      - **Tax Optimization:** Calculates your exact headroom up to the Scottish Higher Rate threshold (£43,662 gross). It draws from taxable pensions up to £43,662, then switches to tax-free ISAs/GIA for any remaining net income need, completely dodging the 42% Scottish tax bracket.
-      - **Pension Priority:** Prioritizes UK DC Pension first (especially when 25% Tax-Free UFPLS is active to maximize net cash per pound of gross bracket).
-      - **Downturn Protection:** In market down years, it halts equity sales and burns Cash Savings/Cash ISA down to your specified **Cash Buffer** (e.g. 2 years of income) to mitigate Sequence of Returns Risk.
-    * **2. Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)**:
-      - **Tax Optimization & Protection:** Exactly identical tax-capping (£43,662 limit) and downturn protection (Cash Buffer) as Option 1.
-      - **Pension Priority:** Explicitly draws from your **US 401(k) FIRST** across all tax bands (0% PA, 19%, 20%, 21%), zeroing out your 401(k) as early as possible.
-      - **Why use this:** Ideal for US ex-pats / UK residents who want to eliminate foreign tax reporting complexity (IRS Form 1040/1040-NR & FBAR filings) early in retirement.
-    * **3. Dynamic Cash Buffer (Equities in Up years, Cash in Down years)**:
-      - **Up Years:** Draws from equity investments (401k -> S&S ISA -> GIA -> DC Pension).
-      - **Down Years:** Halts equity sales completely and draws from Cash Savings and Cash ISA to give your stock portfolio time to recover from market crashes.
-    * **4. Equities First (Preserve Cash completely)**:
-      - Sells equity investments first (401k -> S&S ISA -> GIA -> DC Pension) regardless of market conditions, preserving cash reserves indefinitely.
-    * **5. Cash First (Burn Cash immediately)**:
-      - Exhausts all liquid Cash Savings and Cash ISAs immediately in Year 1 before touching any invested pensions or ISAs.
-
-    ### 5. Reading the Graphs
-    * **The Probability Cone**: The large green shaded areas represent the statistical likelihood of your wealth over time. The inner shade is the 25th-75th percentile. The outer shade is the 10th-90th percentile. If the cone approaches the red **Failure Zone**, there is a risk of running out of money.
-    * **Clickable Paths**: Click any of the blue paths in the top graph to load that exact simulation into the deep-dive charts below.
-    * **Deep Dive Charts**: When you select a path, the bottom charts show you EXACTLY where your income came from each year, what your pot balances were, and how your Blended Portfolio Return compared to the Raw Stock Market Return.
-
-    ### 6. Tax & Allowance Model Details
-    The simulator models the following taxes and allowances on each pot type:
-
-    #### 6.1 Scottish Income Tax (2025-26 Rates)
-    All taxable pension income (DC Pension, 401k, DB, State Pension) is taxed using **2025-26 Scottish Income Tax** rates. The bands and rates used are:
-    | Band | Width | Rate |
-    |---|---|---|
-    | Personal Allowance | £12,570 | 0% |
-    | Starter Rate | £2,306 | 19% |
-    | Basic Rate | £11,685 | 20% |
-    | Intermediate Rate | £17,101 | 21% |
-    | Higher Rate | £31,338 | 42% |
-    | Advanced Rate | £50,140 | 45% |
-    | Top Rate | Remainder | 48% |
-
-    * **Personal Allowance Taper:** Income above £100,000 reduces the PA by £1 for every £2. PA is fully lost at £125,140. The £100k threshold is **frozen** (never inflation-adjusted), matching real UK policy since 2010.
-    * **Retirees do not pay National Insurance** on pension withdrawals — this is correctly modelled.
-    * **Fiscal Drag:** If Tax Bracket Inflation is set lower than General Inflation, the bands erode in real terms and you pay more tax over time.
-    * The simulator uses a **binary search** to "gross up" your net income target, finding the exact gross withdrawal needed to deliver a specific net amount at your current marginal rate.
-
-    #### 6.2 DC Pension & US 401(k)
-    * **Growth inside the wrapper** is tax-free.
-    * **Withdrawals** are taxed as earned income via the Scottish bands above.
-    * **UFPLS (Uncrystallised Funds Pension Lump Sum):** 25% of each withdrawal is tax-free (deducted from your Lump Sum Allowance). The remaining 75% is taxed as income.
-    * **Phased PCLS (Pension Commencement Lump Sum):** Each year, up to £20,000 is transferred tax-free from your DC Pension to your S&S ISA, deducted from your LSA. The remaining pension stays uncrystallised.
-    * **Lump Sum Allowance (LSA):** Capped at £268,275 across your lifetime. Once exhausted, all pension withdrawals become 100% taxable.
-
-    #### 6.3 Cash Savings
-    * **Interest** is calculated annually at the Cash/Bond Yield rate.
-    * **Personal Savings Allowance (PSA):**
-      - Basic/Intermediate rate taxpayers (income ≤ £43,662): **£1,000** tax-free.
-      - Higher rate taxpayers (income £43,662 – £75,000): **£500** tax-free.
-      - Advanced/Top rate taxpayers (income > £75,000): **£0** (no PSA).
-    * Interest above the PSA is taxed at your **marginal Scottish income tax rate** (calculated using your guaranteed income as the base). Tax is deducted directly from the pot.
-    * **Withdrawals** from savings are tax-free (the capital has already been taxed as earnings).
-
-    #### 6.4 General Investment Account (GIA)
-    * **Growth** inside the GIA is **not taxed** until you sell (unrealised gains).
-    * **Capital Gains Tax (CGT)** is applied **only on the gain portion** of each sale:
-      - The simulator tracks your **cost basis** (original investment). When you sell, the gain is `sale × (1 − cost_basis ÷ pot_value)`.
-      - The first **£3,000** of realised gains per year is covered by the **Annual CGT Exemption** (2024-25 onwards).
-      - Gains above £3,000 are taxed at **20%** (higher rate CGT).
-      - If you don't sell, no CGT is triggered — gains are deferred.
-    * **Withdrawals** are reduced by the CGT owed, so the net amount reaching your pocket is lower than the gross sale.
-
-    #### 6.5 ISAs (Cash ISA & Stocks & Shares ISA)
-    * **All growth and withdrawals are completely tax-free.** No income tax, no CGT, no reporting.
-
-    #### 6.6 Guaranteed Income (DB Pension & State Pension)
-    * Taxed as earned income via Scottish bands.
-    * **State Pension Inflation** defaults to General Inflation (conservative vs the Triple Lock).
-    * **DB Pension Inflation** defaults to min(General Inflation, 2.5%), reflecting typical scheme caps.
-    * Both can be independently adjusted in the sidebar.
-
-    #### 6.7 Total Tax Paid
-    The "Total Tax Paid" column in the results table includes:
-    * Scottish Income Tax on all taxable income (pensions, DB, State Pension)
-    * Tax on savings interest (above the PSA, at marginal rate)
-    * Capital Gains Tax on GIA sales (above the £3,000 annual exemption)
-    """)
