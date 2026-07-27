@@ -595,6 +595,26 @@ if new_cfg != st.session_state.cfg:
     b64_str = base64.b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8")
     st.query_params["state"] = b64_str
 
+with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
+    st.markdown("**Tip:** Your settings are automatically saved in the URL! Simply **bookmark this page** to save your current scenario, or copy the URL to share it.")
+    st.write("---")
+    st.write("Or, export/import to a file:")
+    json_to_export = json.dumps(new_cfg, indent=2)
+    st.download_button("📥 Export Settings (JSON)", data=json_to_export, file_name="retirement_scenario.json", mime="application/json")
+    
+    uploaded_file = st.file_uploader("📤 Import Settings (JSON)", type=["json"])
+    if uploaded_file is not None:
+        try:
+            imported_cfg = json.load(uploaded_file)
+            # Only update if the uploaded file is different from current state
+            if imported_cfg != new_cfg:
+                st.session_state.cfg = imported_cfg
+                b64_str = base64.b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8")
+                st.query_params["state"] = b64_str
+                st.rerun()
+        except Exception as e:
+            st.error(f"Failed to load: {e}")
+
 # FIX #13: Validate age range
 if current_age >= end_age:
     st.error("Current Age must be less than End Age (Life Expectancy).")
