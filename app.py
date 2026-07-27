@@ -604,16 +604,17 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
     
     uploaded_file = st.file_uploader("📤 Import Settings (JSON)", type=["json"])
     if uploaded_file is not None:
-        try:
-            imported_cfg = json.load(uploaded_file)
-            # Only update if the uploaded file is different from current state
-            if imported_cfg != new_cfg:
+        if st.button("Apply Imported Settings"):
+            try:
+                # Seek to 0 in case it was read before
+                uploaded_file.seek(0)
+                imported_cfg = json.load(uploaded_file)
                 st.session_state.cfg = imported_cfg
                 b64_str = base64.b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8")
                 st.query_params["state"] = b64_str
                 st.rerun()
-        except Exception as e:
-            st.error(f"Failed to load: {e}")
+            except Exception as e:
+                st.error(f"Failed to load: {e}")
 
 # FIX #13: Validate age range
 if current_age >= end_age:
