@@ -610,6 +610,12 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                 uploaded_file.seek(0)
                 imported_cfg = json.load(uploaded_file)
                 st.session_state.cfg = imported_cfg
+                
+                # Clear widget states to force Streamlit to re-read from cfg
+                for k in list(st.session_state.keys()):
+                    if k.endswith('_widget'):
+                        del st.session_state[k]
+                
                 b64_str = base64.b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8")
                 st.query_params["state"] = b64_str
                 st.rerun()
