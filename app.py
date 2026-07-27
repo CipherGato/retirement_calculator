@@ -627,13 +627,21 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                 imported_cfg = json.load(uploaded_file)
                 st.session_state.cfg = imported_cfg
                 
-                # Clear widget states to force Streamlit to re-read from cfg
-                for k in list(st.session_state.keys()):
-                    if k.endswith('_widget'):
-                        del st.session_state[k]
+                # Inject imported values directly into session state to force Streamlit to adopt them
+                for k, v in imported_cfg.items():
+                    if k == "drawdown_strategy_index":
+                        st.session_state["drawdown_strategy_widget"] = drawdown_options[min(v, len(drawdown_options)-1)]
+                    elif k == "sim_model_index":
+                        st.session_state["sim_model_widget"] = sim_models[min(v, len(sim_models)-1)]
+                    elif k == "dc_tax_free_index":
+                        st.session_state["dc_tax_free_widget"] = dc_options[min(v, len(dc_options)-1)]
+                    else:
+                        st.session_state[f"{k}_widget"] = v
                 
-                b64_str = base64.urlsafe_b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
-                st.query_params["state"] = b64_str
+                # Do not set the massive URL on import to prevent websocket disconnects
+                # Instead, clear any existing long URL to ensure stability
+                st.query_params.clear()
+                
                 st.success("Settings imported successfully!")
                 st.rerun()
             except Exception as e:
