@@ -56,14 +56,19 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                 
                 # Inject imported values directly into session state to force Streamlit to adopt them
                 for k, v in imported_cfg.items():
+                    widget_key = f"{k}_widget"
                     if k == "drawdown_strategy_index":
                         st.session_state["drawdown_strategy_widget"] = ["Equities First", "Equities First (401k First)", "Tax-Optimised (Cap at Basic Rate, Protect Cash)", "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"][min(v, 3)]
                     elif k == "sim_model_index":
                         st.session_state["sim_model_widget"] = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"][min(v, 2)]
                     elif k == "dc_tax_free_index":
                         st.session_state["dc_tax_free_widget"] = ["100% Taxable (Already taken / Default)", "UFPLS (25% Tax-Free per withdrawal)", "Phased PCLS (Move £20k/yr Tax-Free to S&S ISA)"][min(v, 2)]
+                    elif k == "spending_points":
+                        # data_editor does not allow programmatic state assignment. We must delete its key to force it to use get_val().
+                        if widget_key in st.session_state:
+                            del st.session_state[widget_key]
                     else:
-                        st.session_state[f"{k}_widget"] = v
+                        st.session_state[widget_key] = v
                 
                 # Do not set the massive URL on import to prevent websocket disconnects
                 # Instead, clear any existing long URL to ensure stability
