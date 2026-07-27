@@ -45,7 +45,7 @@ dc_options = [
 
 
 # --- Import & Export ---
-with st.sidebar.expander("7. Save & Load Scenarios", expanded=False):
+with st.sidebar.expander("💾 Save & Load Scenarios", expanded=False):
     st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
     if st.button("🔗 Generate Bookmark Link", help="Updates the URL with your current settings so you can bookmark or share it."):
         b64_str = base64.urlsafe_b64encode(json.dumps(st.session_state.cfg).encode("utf-8")).decode("utf-8").rstrip("=")
