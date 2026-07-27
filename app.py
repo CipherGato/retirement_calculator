@@ -112,7 +112,18 @@ def simulate_scenario(inputs, market_returns):
         inflation_factor = (1 + inputs['inflation_rate']) ** i
         tax_inflation_factor = (1 + inputs['tax_band_inflation']) ** i
         
-        base_target_net = inputs['target_net_active'] if age < inputs['active_years_end'] else inputs['target_net_later']
+        spending_points = inputs.get('spending_points', [])
+        base_target_net = 50000 # Fallback
+        if spending_points:
+            sorted_pts = sorted(spending_points, key=lambda x: x.get('From Age', 0), reverse=True)
+            for pt in sorted_pts:
+                if age >= pt.get('From Age', 0):
+                    base_target_net = pt.get('Target Net (£)', 0)
+                    break
+            # If age is before all points, use the first point chronologically (which is the last in reverse sort)
+            if base_target_net == 0 and sorted_pts:
+                base_target_net = sorted_pts[-1].get('Target Net (£)', 0)
+
         target_net = base_target_net * inflation_factor
         
         db_inflation_factor = (1 + inputs.get('db_inflation', inputs['inflation_rate'])) ** i
@@ -445,15 +456,18 @@ with st.sidebar:
         end_age = st.number_input("End Age (Life Expectancy)", min_value=50, max_value=120, value=get_val('end_age', 95), key="end_age_widget", help="The age you expect to live until. Used to calculate the total simulation length.")
         
     with st.expander("2. Income Goals & Economy", expanded=False):
-        target_net_active = st.number_input("Target Net Income Active Years (Today's £)", min_value=0, value=get_val('target_net_active', 50000), step=1000, key="target_net_active_widget", help="The actual spending money you want in your pocket (after tax) during your early, active retirement years. The simulator automatically inflates this over time.")
-        gross_active = gross_up_for_tax(target_net_active, 0, 1.0)
-        st.markdown(f"<p style='margin-top:-15px; margin-bottom:15px; font-size:14px; color:gray;'>Equivalent to a Gross Salary of <b>£{gross_active:,.0f}</b> <br/><i>(Note: Retirees do not pay National Insurance on pension income)</i></p>", unsafe_allow_html=True)
+        st.write("Target Net Income (Today's £) by Age")
+        st.caption("Define your spending phases. The simulator automatically inflates these targets over time. Add as many phases as you like.")
+        default_spending = [{"From Age": 55, "Target Net (£)": 50000}, {"From Age": 75, "Target Net (£)": 35000}]
+        spending_points = st.data_editor(get_val('spending_points', default_spending), num_rows="dynamic", key="spending_points_widget", use_container_width=True, hide_index=True)
         
-        active_years_end = st.number_input("Active Years End Age", min_value=50, max_value=100, value=get_val('active_years_end', 75), key="active_years_end_widget", help="The age at which you expect your spending to decrease.")
-        
-        target_net_later = st.number_input("Target Net Income Later Years (Today's £)", min_value=0, value=get_val('target_net_later', 35000), step=1000, key="target_net_later_widget", help="Your spending target later in life (expressed in Today's money). The simulator automatically inflates this over time.")
-        gross_later = gross_up_for_tax(target_net_later, 0, 1.0)
-        st.markdown(f"<p style='margin-top:-15px; margin-bottom:15px; font-size:14px; color:gray;'>Equivalent to a Gross Salary of <b>£{gross_later:,.0f}</b> <br/><i>(Note: Retirees do not pay National Insurance on pension income)</i></p>", unsafe_allow_html=True)
+        if spending_points:
+            try:
+                first_target = float(spending_points[0].get("Target Net (£)", 0))
+                gross_first = gross_up_for_tax(first_target, 0, 1.0)
+                st.markdown(f"<p style='margin-top:-5px; margin-bottom:15px; font-size:14px; color:gray;'>First phase equivalent to Gross Salary: <b>£{gross_first:,.0f}</b> <br/><i>(Note: Retirees do not pay National Insurance on pension income)</i></p>", unsafe_allow_html=True)
+            except Exception:
+                pass
         
         st.write("---")
         inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
@@ -546,9 +560,7 @@ with st.sidebar:
 new_cfg = {
     'current_age': current_age,
     'end_age': end_age,
-    'target_net_active': target_net_active,
-    'target_net_later': target_net_later,
-    'active_years_end': active_years_end,
+    'spending_points': spending_points,
     'inflation_rate_pct': inflation_rate_pct,
     'tax_band_inflation_pct': tax_band_inflation_pct,
     'usd_gbp_rate': usd_gbp_rate,
@@ -591,9 +603,7 @@ if current_age >= end_age:
 inputs = {
     'current_age': current_age,
     'end_age': end_age,
-    'target_net_active': target_net_active,
-    'target_net_later': target_net_later,
-    'active_years_end': active_years_end,
+    'spending_points': spending_points,
     'inflation_rate': inflation_rate,
     'tax_band_inflation': tax_band_inflation,
     'usd_gbp_rate': usd_gbp_rate,
