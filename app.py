@@ -13,8 +13,9 @@ if 'cfg' not in st.session_state:
     if "state" in st.query_params:
         try:
             b64_str = st.query_params["state"]
-            # Fix accidental URL unquoting of standard base64 '+' into spaces
             b64_str = b64_str.replace(" ", "+")
+            # Restore missing padding that gets stripped by URL parsers
+            b64_str += "=" * ((4 - len(b64_str) % 4) % 4)
             try:
                 decoded_bytes = base64.urlsafe_b64decode(b64_str)
             except Exception:
@@ -598,7 +599,7 @@ new_cfg = {
 # Save to URL query params if changed
 if new_cfg != st.session_state.cfg:
     st.session_state.cfg = new_cfg
-    b64_str = base64.urlsafe_b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8")
+    b64_str = base64.urlsafe_b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
     st.query_params["state"] = b64_str
 
 with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
@@ -622,7 +623,7 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                     if k.endswith('_widget'):
                         del st.session_state[k]
                 
-                b64_str = base64.urlsafe_b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8")
+                b64_str = base64.urlsafe_b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
                 st.query_params["state"] = b64_str
                 st.rerun()
             except Exception as e:
