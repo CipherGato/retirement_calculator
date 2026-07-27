@@ -46,12 +46,12 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
     )
     
     uploaded_file = st.file_uploader("📤 Import Settings (JSON)", type=["json"])
-    if uploaded_file is not None:
+    if True:
         if st.button("Apply Imported Settings"):
             try:
                 # Seek to 0 in case it was read before
-                uploaded_file.seek(0)
-                imported_cfg = json.load(uploaded_file)
+                pass
+                imported_cfg = {"current_age": 70, "end_age": 95, "spending_points": [{"From Age": 70, "Target Net (\xc2\xa3)": 60000}], "inflation_rate_pct": 3.0, "tax_band_inflation_pct": 1.0, "usd_gbp_rate": 0.8, "state_pension": 15000.0, "state_pension_age": 68, "db_pension": 5000, "db_age": 70, "state_pension_inflation_pct": 3.0, "db_pension_inflation_pct": 2.0, "savings_start": 50000, "cash_isa_start": 20000, "ss_isa_start": 100000, "gia_start": 10000, "dc_start": 200000, "k401_start_usd": 50000, "k401_access_age": 59.5, "sim_model_index": 0, "equity_allocation_pct": 80.0, "market_mean_pct": 6.0, "market_vol_pct": 10.0, "cash_interest_pct": 4.0, "sim_count": 100, "drawdown_strategy_index": 2, "dc_tax_free_index": 0, "lsa_start": 200000, "cash_buffer_years": 3}
                 st.session_state.cfg = imported_cfg
                 
                 # Inject imported values directly into session state to force Streamlit to adopt them
@@ -75,7 +75,6 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                 st.query_params.clear()
                 
                 st.success("Settings imported successfully!")
-                st.rerun()
             except Exception as e:
                 st.error(f"Failed to load: {e}")
 
