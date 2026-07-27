@@ -596,14 +596,17 @@ new_cfg = {
     'cash_buffer_years': cash_buffer_years
 }
 
-# Save to URL query params if changed
+# Save to internal session state
 if new_cfg != st.session_state.cfg:
     st.session_state.cfg = new_cfg
-    b64_str = base64.urlsafe_b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
-    st.query_params["state"] = b64_str
 
 with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
-    st.markdown("**Tip:** Your settings are automatically saved in the URL! Simply **bookmark this page** to save your current scenario, or copy the URL to share it.")
+    st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
+    if st.button("🔗 Generate Bookmark Link", help="Updates the URL with your current settings so you can bookmark or share it."):
+        b64_str = base64.urlsafe_b64encode(json.dumps(new_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
+        st.query_params["state"] = b64_str
+        st.success("URL updated! You can now bookmark or copy the URL.")
+    
     st.write("---")
     st.write("Or, export/import to a file:")
     json_to_export = json.dumps(new_cfg, indent=2)
@@ -625,6 +628,7 @@ with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
                 
                 b64_str = base64.urlsafe_b64encode(json.dumps(imported_cfg).encode("utf-8")).decode("utf-8").rstrip("=")
                 st.query_params["state"] = b64_str
+                st.success("Settings imported successfully!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to load: {e}")
