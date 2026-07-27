@@ -487,7 +487,7 @@ with st.sidebar:
     with st.expander("3. Guaranteed Income", expanded=False):
         state_pension = st.number_input("UK State Pension (Annual £)", min_value=0.0, value=float(get_val('state_pension', 11502.40)), step=100.0, key="state_pension_widget", help="Current value of the full UK State Pension.")
         state_pension_age = st.number_input("State Pension Age", min_value=55, max_value=80, value=get_val('state_pension_age', 67), key="state_pension_age_widget", help="The age you will start receiving the UK State Pension.")
-        db_pension = st.number_input("Defined Benefit Pension (Annual £)", min_value=0, value=get_val('db_pension', 10000), key="db_pension_widget", help="Annual gross income from your Defined Benefit (final salary) pension.")
+        db_pension = st.number_input("Defined Benefit Pension (Annual £)", min_value=0, value=get_val('db_pension', 0), key="db_pension_widget", help="Annual gross income from your Defined Benefit (final salary) pension.")
         db_age = st.number_input("DB Pension Start Age", min_value=50, max_value=80, value=get_val('db_age', 65), key="db_age_widget", help="The age your DB pension begins paying out.")
         
         st.write("---")
@@ -495,7 +495,7 @@ with st.sidebar:
         db_pension_inflation_pct = st.slider("DB Pension Inflation (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(inflation_rate_pct, 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Annual increase in your Defined Benefit pension. Many schemes cap increases at CPI or 2.5%, whichever is lower. Defaults to min(inflation, 2.5%).")
         
     with st.expander("4. Pensions & Allowances", expanded=False):
-        dc_start = st.number_input("Defined Contribution Pension (£)", min_value=0, value=get_val('dc_start', 250000), step=10000, key="dc_start_widget", help="Defined Contribution Pension. Handled according to the strategy chosen below.")
+        dc_start = st.number_input("Defined Contribution Pension (£)", min_value=0, value=get_val('dc_start', 0), step=10000, key="dc_start_widget", help="Defined Contribution Pension. Handled according to the strategy chosen below.")
         
         dc_options = [
             "100% Taxable (Already taken / Default)",
@@ -509,14 +509,14 @@ with st.sidebar:
         lsa_start = st.number_input("Lump Sum Allowance (LSA) Remaining (£)", min_value=0, max_value=268275, value=get_val('lsa_start', 268275), step=1000, key="lsa_start_widget", help="The UK LSA limits how much tax-free cash you can take across your lifetime. Max is £268,275.")
         
         st.write("---")
-        k401_start_usd = st.number_input("US 401k ($ USD)", min_value=0, value=get_val('k401_start_usd', 100000), step=10000, key="k401_start_usd_widget", help="US 401k balance in USD. Treated as 100% taxable in the UK.")
+        k401_start_usd = st.number_input("US 401k ($ USD)", min_value=0, value=get_val('k401_start_usd', 0), step=10000, key="k401_start_usd_widget", help="US 401k balance in USD. Treated as 100% taxable in the UK.")
         k401_access_age = st.number_input("US 401k Access Age (Penalty Free)", min_value=50.0, max_value=70.0, value=float(get_val('k401_access_age', 59.5)), step=0.5, key="k401_access_age_widget", help="Age at which you can access your 401k without a 10% penalty (typically 59.5).")
 
     with st.expander("5. Savings & Investments", expanded=False):
-        savings_start = st.number_input("Cash Savings (£)", min_value=0, value=get_val('savings_start', 20000), step=5000, key="savings_start_widget", help="Cash in regular bank accounts. Interest taxed above the £500 Personal Savings Allowance.")
-        cash_isa_start = st.number_input("Cash ISA (£)", min_value=0, value=get_val('cash_isa_start', 10000), step=5000, key="cash_isa_start_widget", help="Cash in a tax-free ISA.")
-        ss_isa_start = st.number_input("Stocks & Shares ISA (£)", min_value=0, value=get_val('ss_isa_start', 90000), step=10000, key="ss_isa_start_widget", help="Investments in a tax-free Stocks & Shares ISA.")
-        gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 30000), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
+        savings_start = st.number_input("Cash Savings (£)", min_value=0, value=get_val('savings_start', 0), step=5000, key="savings_start_widget", help="Cash in regular bank accounts. Interest taxed above the £500 Personal Savings Allowance.")
+        cash_isa_start = st.number_input("Cash ISA (£)", min_value=0, value=get_val('cash_isa_start', 0), step=5000, key="cash_isa_start_widget", help="Cash in a tax-free ISA.")
+        ss_isa_start = st.number_input("Stocks & Shares ISA (£)", min_value=0, value=get_val('ss_isa_start', 0), step=10000, key="ss_isa_start_widget", help="Investments in a tax-free Stocks & Shares ISA.")
+        gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 0), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
         
     with st.expander("6. Market Assumptions", expanded=False):
         sim_models = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
