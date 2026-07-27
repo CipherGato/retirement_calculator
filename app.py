@@ -597,8 +597,14 @@ new_cfg = {
 }
 
 # Save to internal session state
+import time
+with open("debug_log.txt", "a") as f: f.write(f"\n--- RUN {time.time()} ---\nCFG: {st.session_state.cfg}\nNEW: {new_cfg}\n")
 if new_cfg != st.session_state.cfg:
     st.session_state.cfg = new_cfg
+
+with st.sidebar.expander("🛠 DEBUG STATE", expanded=False):
+    st.write("Widget keys:", [k for k in st.session_state.keys() if k.endswith("_widget")])
+    st.write("CFG:", st.session_state.cfg)
 
 with st.sidebar.expander("8. Save & Load Scenarios", expanded=False):
     st.markdown("**Tip:** You can generate a URL to save or share your exact scenario.")
