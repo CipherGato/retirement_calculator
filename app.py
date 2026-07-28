@@ -745,7 +745,7 @@ st.session_state.cfg = {
     'db_lump_sum': db_lump_sum,
     'use_hist_inflation': use_hist_inflation,
     'tax_band_match': tax_band_match,
-    'tax_band_match_pct': tax_band_match_pct if 'tax_band_match_pct' in locals() else 100.0,
+    'tax_band_match_pct': tax_band_match_pct,
     'state_pension_inflation_pct': state_pension_inflation_pct,
     'db_pension_inflation_pct': db_pension_inflation_pct,
     'savings_start': savings_start,
