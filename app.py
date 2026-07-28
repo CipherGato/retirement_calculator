@@ -28,7 +28,7 @@ if 'cfg' not in st.session_state:
 
 
 # --- GLOBAL CONSTANTS ---
-sim_models = ["Normal Distribution (Bell Curve)", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
+sim_models = ["Normal Distribution (Bell Curve)", "Configurable Flat Return", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
 
 drawdown_options = [
     "Equities First",
@@ -209,6 +209,20 @@ def simulate_scenario(inputs, market_returns):
         shortfall_net = max(0, target_net - guaranteed_net)
         
         current_gross = guaranteed_gross
+        
+        # Check for DB lump sum event
+        if age == inputs.get('db_age') and inputs.get('db_lump_sum', 0) > 0:
+            db_ls = inputs['db_lump_sum']
+            if lsa_remaining >= db_ls:
+                lsa_remaining -= db_ls
+                net_db_ls = db_ls
+            else:
+                taxable_db_ls = db_ls - lsa_remaining
+                net_db_ls = lsa_remaining + (taxable_db_ls - (calculate_scottish_tax(current_gross + taxable_db_ls, tax_inflation_factor) - calculate_scottish_tax(current_gross, tax_inflation_factor)))
+                current_gross += taxable_db_ls
+                lsa_remaining = 0
+            
+            pots['Savings'] += net_db_ls
         
         withdrawals = {
             'Savings': 0, 'Cash_ISA': 0, 'SS_ISA': 0, 'GIA': 0, 'DC_Pension_Net': 0, 'US_401k_Net': 0
@@ -555,6 +569,7 @@ with st.sidebar:
         state_pension_age = st.number_input("State Pension Age", min_value=55, max_value=80, value=get_val('state_pension_age', 67), key="state_pension_age_widget", help="The age you will start receiving the UK State Pension.")
         db_pension = st.number_input("Defined Benefit Pension (Annual £)", min_value=0, value=get_val('db_pension', 0), key="db_pension_widget", help="Annual gross income from your Defined Benefit (final salary) pension.")
         db_age = st.number_input("DB Pension Start Age", min_value=50, max_value=80, value=get_val('db_age', 65), key="db_age_widget", help="The age your DB pension begins paying out.")
+        db_lump_sum = st.number_input("DB Tax-Free Lump Sum (PCLS) (£)", min_value=0, value=get_val('db_lump_sum', 0), step=5000, key="db_lump_sum_widget", help="Tax-free lump sum received at DB start age. Uses up your Lump Sum Allowance.")
         
         st.write("---")
         state_pension_inflation_pct = st.slider("State Pension Inflation (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', inflation_rate_pct), 0.1, key="state_pension_inflation_pct_widget", help="Annual increase in the UK State Pension. The Triple Lock guarantees the higher of inflation, average earnings growth, or 2.5%. Defaults to general inflation (conservative).")
@@ -598,6 +613,10 @@ with st.sidebar:
             market_mean_pct = st.slider("Expected Stock Market Return (%)", 0.0, 15.0, market_mean_pct, 0.1, key="market_mean_pct_widget", help="Expected average annual return of the stock market.")
             market_vol_pct = st.slider("Stock Market Volatility (%)", 0.0, 30.0, market_vol_pct, 0.5, key="market_vol_pct_widget", help="Expected volatility (standard deviation) of the stock market.")
             sim_count = st.number_input("Monte Carlo Simulations", min_value=1, max_value=1000, value=get_val('sim_count', 500), key="sim_count_widget", help="Number of random lifetimes to simulate.")
+        elif sim_model == "Configurable Flat Return":
+            market_mean_pct = st.slider("Flat Stock Market Return (%)", 0.0, 15.0, market_mean_pct, 0.1, key="market_mean_pct_widget", help="Expected flat annual return of the stock market.")
+            market_vol_pct = 0.0
+            sim_count = 1
         elif sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
             st.info("Using exactly 96 retirements, each starting in a different historical year (1928 to 2023). Stock Return sliders disabled.")
             sim_count = 96
@@ -639,6 +658,7 @@ st.session_state.cfg = {
     'state_pension_age': state_pension_age,
     'db_pension': db_pension,
     'db_age': db_age,
+    'db_lump_sum': db_lump_sum,
     'state_pension_inflation_pct': state_pension_inflation_pct,
     'db_pension_inflation_pct': db_pension_inflation_pct,
     'savings_start': savings_start,
@@ -685,6 +705,7 @@ inputs = {
     'state_pension_age': state_pension_age,
     'db_pension': db_pension,
     'db_age': db_age,
+    'db_lump_sum': db_lump_sum,
     'sp_inflation': state_pension_inflation_pct / 100.0,
     'db_inflation': db_pension_inflation_pct / 100.0,
     'savings_start': savings_start,
@@ -743,7 +764,9 @@ with tab_sim:
         final_pots = []
         
         for sim in range(sim_count):
-            if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
+            if sim_model == "Configurable Flat Return":
+                returns = np.full(years, market_mean)
+            elif sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
                 start_idx = sim
                 returns = np.array([HISTORICAL_RETURNS_SP500[(start_idx + i) % len(HISTORICAL_RETURNS_SP500)] for i in range(years)])
             elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
