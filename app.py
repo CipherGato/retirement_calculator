@@ -611,8 +611,12 @@ with st.sidebar:
             "25% Tax-Free (UFPLS) on every withdrawal",
             "Phased PCLS (Move £20k/yr Tax-Free to S&S ISA)"
         ]
-        saved_dc_index = get_val('dc_tax_free_index', 0)
-        if saved_dc_index >= len(dc_options): saved_dc_index = 0
+        _current_dc_val = st.session_state.get("dc_tax_free_widget")
+        if _current_dc_val is not None and _current_dc_val in dc_options:
+            saved_dc_index = dc_options.index(_current_dc_val)
+        else:
+            saved_dc_index = get_val('dc_tax_free_index', 0)
+            if saved_dc_index >= len(dc_options): saved_dc_index = 0
         
         dc_tax_free_method = st.radio("DC Pension Tax-Free Handling", dc_options, index=saved_dc_index, key="dc_tax_free_widget", help="UFPLS makes every withdrawal 25% tax-free. Phased PCLS transfers £20k a year into your ISA until the allowance runs out. 100% Taxable assumes you've already taken the cash.")
         lsa_start = st.number_input("Lump Sum Allowance (LSA) Remaining (£)", min_value=0, max_value=268275, value=get_val('lsa_start', 268275), step=1000, key="lsa_start_widget", help="The UK LSA limits how much tax-free cash you can take across your lifetime. Max is £268,275.")
@@ -628,8 +632,13 @@ with st.sidebar:
         gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 0), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
         
     with st.expander("6. Market Assumptions", expanded=False):
-        sim_model_index = get_val('sim_model_index', 0)
-        if sim_model_index >= len(sim_models): sim_model_index = 0
+        _current_sim_val = st.session_state.get("sim_model_widget")
+        if _current_sim_val is not None and _current_sim_val in sim_models:
+            sim_model_index = sim_models.index(_current_sim_val)
+        else:
+            sim_model_index = get_val('sim_model_index', 0)
+            if sim_model_index >= len(sim_models): sim_model_index = 0
+            
         sim_model = st.radio("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
         
         equity_allocation_pct = st.slider("Portfolio Equity Allocation (Stocks vs Bonds/Cash)", 0.0, 100.0, get_val('equity_allocation_pct', 100.0), 5.0, key="equity_allocation_pct_widget", help="100% means fully invested in stocks. 60% means 60% stocks and 40% bonds/cash.")
@@ -698,8 +707,12 @@ with st.sidebar:
             "Equities First (Preserve Cash completely)",
             "Cash First (Burn Cash immediately)"
         ]
-        saved_index = get_val('drawdown_strategy_index', 0)
-        if saved_index >= len(drawdown_options): saved_index = 0
+        _current_dd_val = st.session_state.get("drawdown_strategy_widget")
+        if _current_dd_val is not None and _current_dd_val in drawdown_options:
+            saved_index = drawdown_options.index(_current_dd_val)
+        else:
+            saved_index = get_val('drawdown_strategy_index', 0)
+            if saved_index >= len(drawdown_options): saved_index = 0
         
         drawdown_strategy = st.radio("Drawdown Strategy", drawdown_options, index=saved_index, key="drawdown_strategy_widget", help="Tax-Optimised mathematically blends pots to avoid the 42% tax bracket. Other options rigidly follow a sequence.")
         
