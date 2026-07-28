@@ -1130,7 +1130,7 @@ with tab_help:
     * **Deep Dive Charts**: Shows exactly where your income came from each year, pot balances over time, and your Blended Portfolio Return vs the Raw Stock Market Return (including the exact historical Bank of England Cash Yields and Inflation).
 
     ### 9. Saving & Loading (Bookmarks)
-    * **Generate Bookmark Link**: At the bottom of the sidebar, click the "Generate Bookmark Link" button. This automatically saves all of your current settings directly into the web address (URL).
+    * **Generate Bookmark Link**: In the sidebar under the "💾 Save & Load Scenarios" section, click the "Generate Bookmark Link" button. This automatically saves all of your current settings directly into the web address (URL).
     * **Sharing**: You can copy this URL to send your exact retirement scenario to someone else.
     * **Loading**: Simply bookmark the URL in your browser. Whenever you visit that bookmark, the simulator will instantly load all of your custom settings.
     ''')
