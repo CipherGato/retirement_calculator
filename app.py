@@ -679,8 +679,11 @@ with st.sidebar:
             st.info("Inflation and Cash/Bond Yields will perfectly mirror historical UK rates for the simulated years.")
             inflation_rate_pct = get_val('inflation_rate_pct', 2.5)
             inflation_rate = inflation_rate_pct / 100.0
+            _curr_match = st.session_state.get("tax_band_match_pct_widget")
             fallback_match_pct = get_val('tax_band_match', 1.0) * 100.0
-            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', fallback_match_pct), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
+            saved_match_pct = get_val('tax_band_match_pct', fallback_match_pct)
+            display_match_pct = float(_curr_match) if _curr_match is not None else saved_match_pct
+            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, display_match_pct, 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
             tax_band_match = tax_band_match_pct / 100.0
             tax_band_inflation = inflation_rate * tax_band_match
             tax_band_inflation_pct = tax_band_inflation * 100.0
@@ -690,7 +693,10 @@ with st.sidebar:
         else:
             inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
             inflation_rate = inflation_rate_pct / 100.0
-            tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen.")
+            _curr_band_inf = st.session_state.get("tax_band_inflation_pct_widget")
+            saved_band_inf = get_val('tax_band_inflation_pct', 0.0)
+            display_band_inf = float(_curr_band_inf) if _curr_band_inf is not None else saved_band_inf
+            tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, display_band_inf, 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen.")
             tax_band_inflation = tax_band_inflation_pct / 100.0
             fallback_match_pct = get_val('tax_band_match', 1.0) * 100.0
             tax_band_match_pct = get_val('tax_band_match_pct', fallback_match_pct)
