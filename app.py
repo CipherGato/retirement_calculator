@@ -576,26 +576,6 @@ with st.sidebar:
             except Exception:
                 pass
         
-        st.write("---")
-        use_hist_inflation = st.checkbox("Use Historical UK Inflation & Interest Rates", value=get_val('use_hist_inflation', False), key="use_hist_inflation_widget", help="Links inflation and Bank of England base rates directly to the historical year being simulated (only works with historical market models).")
-        
-        if use_hist_inflation:
-            st.info("Inflation and Cash/Bond Yields will perfectly mirror historical UK rates for the simulated years.")
-            inflation_rate_pct = get_val('inflation_rate_pct', 2.5)
-            inflation_rate = inflation_rate_pct / 100.0
-            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', 100.0), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
-            tax_band_match = tax_band_match_pct / 100.0
-            # For the baseline deterministic path when historical mode is active:
-            tax_band_inflation = inflation_rate * tax_band_match
-            tax_band_inflation_pct = tax_band_inflation * 100.0
-        else:
-            inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
-            inflation_rate = inflation_rate_pct / 100.0
-            tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen (as in reality).")
-            tax_band_inflation = tax_band_inflation_pct / 100.0
-            tax_band_match = 1.0
-        
-        usd_gbp_rate = st.number_input("USD to GBP Exchange Rate", min_value=0.01, max_value=5.0, value=get_val('usd_gbp_rate', 0.75), step=0.01, key="usd_gbp_rate_widget", help="Exchange rate for converting your US 401k to GBP.")
         
     with st.expander("3. Guaranteed Income", expanded=False):
         state_pension = st.number_input("UK State Pension (Annual £)", min_value=0.0, value=float(get_val('state_pension', 12547.60)), step=100.0, key="state_pension_widget", help="Current value of the full UK State Pension.")
@@ -605,8 +585,8 @@ with st.sidebar:
         db_lump_sum = st.number_input("DB Tax-Free Lump Sum (PCLS) (£)", min_value=0, value=get_val('db_lump_sum', 0), step=5000, key="db_lump_sum_widget", help="Tax-free lump sum received at DB start age. Uses up your Lump Sum Allowance.")
         
         st.write("---")
-        state_pension_inflation_pct = st.slider("State Pension Inflation (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', inflation_rate_pct), 0.1, key="state_pension_inflation_pct_widget", help="Annual increase in the UK State Pension. The Triple Lock guarantees the higher of inflation, average earnings growth, or 2.5%. Defaults to general inflation (conservative).")
-        db_pension_inflation_pct = st.slider("DB Pension Inflation (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(inflation_rate_pct, 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Annual increase in your Defined Benefit pension. Many schemes cap increases at CPI or 2.5%, whichever is lower. Defaults to min(inflation, 2.5%).")
+        state_pension_inflation_pct = st.slider("State Pension Inflation (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', get_val('inflation_rate_pct', 2.5)), 0.1, key="state_pension_inflation_pct_widget", help="Annual increase in the UK State Pension. The Triple Lock guarantees the higher of inflation, average earnings growth, or 2.5%. Defaults to general inflation (conservative).")
+        db_pension_inflation_pct = st.slider("DB Pension Inflation (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(get_val('inflation_rate_pct', 2.5), 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Annual increase in your Defined Benefit pension. Many schemes cap increases at CPI or 2.5%, whichever is lower. Defaults to min(inflation, 2.5%).")
         
     with st.expander("4. Pensions & Allowances", expanded=False):
         dc_start = st.number_input("Defined Contribution Pension (£)", min_value=0, value=get_val('dc_start', 0), step=10000, key="dc_start_widget", help="Defined Contribution Pension. Handled according to the strategy chosen below.")
@@ -660,12 +640,36 @@ with st.sidebar:
         market_mean = market_mean_pct / 100.0
         market_vol = market_vol_pct / 100.0
         
+        st.write("---")
+        is_historical = "Historical Rolling Sequence" in sim_model
+        if is_historical:
+            use_hist_inflation = st.checkbox("Use Historical UK Inflation & Interest Rates", value=get_val('use_hist_inflation', False), key="use_hist_inflation_widget", help="Links inflation and Bank of England base rates directly to the historical year being simulated.")
+        else:
+            use_hist_inflation = False
+            
         if use_hist_inflation:
+            st.info("Inflation and Cash/Bond Yields will perfectly mirror historical UK rates for the simulated years.")
+            inflation_rate_pct = get_val('inflation_rate_pct', 2.5)
+            inflation_rate = inflation_rate_pct / 100.0
+            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', 100.0), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
+            tax_band_match = tax_band_match_pct / 100.0
+            tax_band_inflation = inflation_rate * tax_band_match
+            tax_band_inflation_pct = tax_band_inflation * 100.0
+            
             cash_interest_pct = get_val('cash_interest_pct', 3.0)
             cash_interest = cash_interest_pct / 100.0
         else:
+            inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
+            inflation_rate = inflation_rate_pct / 100.0
+            tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen.")
+            tax_band_inflation = tax_band_inflation_pct / 100.0
+            tax_band_match = 1.0
+            
             cash_interest_pct = st.slider("Cash / Bond Yield Rate (%)", 0.0, 10.0, get_val('cash_interest_pct', 3.0), 0.1, key="cash_interest_pct_widget", help="Yield rate applied to Cash Savings, Cash ISAs, and the non-equity portion of your investment portfolio.")
             cash_interest = cash_interest_pct / 100.0
+            
+        st.write("---")
+        usd_gbp_rate = st.number_input("USD to GBP Exchange Rate", min_value=0.01, max_value=5.0, value=get_val('usd_gbp_rate', 0.75), step=0.01, key="usd_gbp_rate_widget", help="Exchange rate for converting your US 401k to GBP.")
         
     with st.expander("7. Drawdown Strategy", expanded=True):
         drawdown_options = [
@@ -1080,12 +1084,8 @@ with tab_help:
     ### 1. Personal Details
     * **Current Age** & **End Age**: Defines the total length of your retirement simulation.
 
-    ### 2. Income Goals & Economy
+    ### 2. Retirement Spending
     * **Target Net Income (Today's £)**: The spending money you want in your pocket *after* all taxes are paid. The simulator will automatically adjust your required withdrawals upwards every year to account for inflation. You can set different targets for different phases of retirement (e.g., active years vs later years).
-    * **Use Historical UK Inflation & Interest Rates**: If checked (and you are using a Historical Rolling market model), this perfectly links UK historical inflation and the Bank of England Base Rate to the exact year of the simulation sequence (e.g. 1970s stagflation paired with 1970s interest rates).
-    * **General Inflation Rate**: The flat assumed annual increase in the cost of living (if not using historical rates).
-    * **Tax Bracket Inflation Match / Tax Bracket Inflation (%) (Fiscal Drag)**: How much the Scottish tax bands inflate relative to general inflation. If set to less than 100% (or lower than general inflation), you will suffer "fiscal drag" (paying more tax over time as brackets stagnate). Note: the £100k Personal Allowance taper threshold is always frozen.
-    * **USD to GBP Rate**: Used to convert your US 401(k) balance.
 
     ### 3. Guaranteed Income
     * **UK State Pension**: Automatically taxed. You can set a custom **State Pension Inflation** rate (defaults to general inflation).
@@ -1106,9 +1106,13 @@ with tab_help:
       - *Normal Distribution (Bell Curve)*: Monte Carlo simulations based on your input mean/volatility.
       - *Configurable Flat Return*: A fully deterministic, 0% volatility projection for baseline testing.
       - *Historical Rolling Sequence (S&P 500 or FTSE All-Share)*: Uses actual historical market returns to perfectly model Sequence of Returns Risk.
-    * **Portfolio Equity Allocation**: For example, a 60% allocation means 60% is in Stocks (experiencing market returns), and 40% is in safe Cash/Bonds (earning the Cash Yield rate).
+    * **Portfolio Equity Allocation**: For example, a 60% allocation means 60% is in Stocks (experiencing market returns), and 40% is in safe Cash/Bonds.
+    * **Use Historical UK Inflation & Interest Rates**: (Visible for Historical models). Perfectly links UK historical inflation and the Bank of England Base Rate to the exact year of the simulation sequence.
+    * **General Inflation Rate**: The flat assumed annual increase in the cost of living (if not using historical rates).
+    * **Tax Bracket Inflation Match / Tax Bracket Inflation (%) (Fiscal Drag)**: How much the Scottish tax bands inflate relative to general inflation. If set to less than 100% (or lower than general inflation), you will suffer "fiscal drag". Note: the £100k PA taper threshold is always frozen.
     * **Cash Yield**: The interest rate earned by your Cash Savings, Cash ISA, and the bond portion of your portfolio. (Hidden/dynamic if "Use Historical UK Inflation" is checked).
-    * **Cash Buffer**: How many years of income to protect in cash during market downturns before being forced to sell equities (used in Tax-Optimised drawdown strategies).
+    * **Cash Buffer**: How many years of income to protect in cash during market downturns before being forced to sell equities.
+    * **USD to GBP Rate**: Used to convert your US 401(k) balance.
 
     ### 7. Drawdown Strategy
     * **1. Tax-Optimised (Cap at Basic Rate, Protect Cash)** *(Recommended)*: Calculates headroom up to the Scottish Higher Rate threshold (£43,662). Draws taxable pensions up to this limit, then switches to tax-free ISAs/GIA to dodge the 42% bracket. Protects cash during market crashes (using Cash Buffer).
