@@ -187,11 +187,11 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
             tax_rates = inflation_returns * inputs.get('tax_band_match', 1.0)
             tax_inflation_factor = np.prod(1 + tax_rates[:i]) if i > 0 else 1.0
             
-            db_cap = inputs.get('db_inflation_cap', 0.025)
+            db_cap = inputs.get('db_inflation', 0.025)
             db_rates = np.minimum(inflation_returns, db_cap)
             db_inflation_factor = np.prod(1 + db_rates[:i]) if i > 0 else 1.0
             
-            sp_floor = inputs.get('sp_inflation_floor', 0.025)
+            sp_floor = inputs.get('sp_inflation', 0.025)
             sp_rates = np.maximum(inflation_returns, sp_floor)
             sp_inflation_factor = np.prod(1 + sp_rates[:i]) if i > 0 else 1.0
         else:
@@ -1088,8 +1088,8 @@ with tab_help:
     * **Target Net Income (Today's £)**: The spending money you want in your pocket *after* all taxes are paid. The simulator will automatically adjust your required withdrawals upwards every year to account for inflation. You can set different targets for different phases of retirement (e.g., active years vs later years).
 
     ### 3. Guaranteed Income
-    * **UK State Pension**: Automatically taxed. You can set a custom **State Pension Inflation** rate (defaults to general inflation).
-    * **Defined Benefit Pension**: Automatically taxed. You can set a **DB Pension Inflation** rate (typically capped at 2.5% in reality).
+    * **UK State Pension**: Automatically taxed. You can set a custom **State Pension Inflation** rate (defaults to general inflation). In *Historical Mode*, this acts as a **floor** to simulate the Triple Lock (e.g. it rises with historical inflation, but never falls below your slider value).
+    * **Defined Benefit Pension**: Automatically taxed. You can set a **DB Pension Inflation** rate. In *Historical Mode*, this acts as a **cap** (e.g. it rises with historical inflation, but never exceeds your slider value).
     * **DB Tax-Free Lump Sum**: Consumes your Lump Sum Allowance (LSA) and is paid tax-free at your DB start age.
 
     ### 4. Pensions & Allowances
