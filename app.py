@@ -614,7 +614,7 @@ with st.sidebar:
         saved_dc_index = get_val('dc_tax_free_index', 0)
         if saved_dc_index >= len(dc_options): saved_dc_index = 0
         
-        dc_tax_free_method = st.selectbox("DC Pension Tax-Free Handling", dc_options, index=saved_dc_index, key="dc_tax_free_widget", help="UFPLS makes every withdrawal 25% tax-free. Phased PCLS transfers £20k a year into your ISA until the allowance runs out. 100% Taxable assumes you've already taken the cash.")
+        dc_tax_free_method = st.radio("DC Pension Tax-Free Handling", dc_options, index=saved_dc_index, key="dc_tax_free_widget", help="UFPLS makes every withdrawal 25% tax-free. Phased PCLS transfers £20k a year into your ISA until the allowance runs out. 100% Taxable assumes you've already taken the cash.")
         lsa_start = st.number_input("Lump Sum Allowance (LSA) Remaining (£)", min_value=0, max_value=268275, value=get_val('lsa_start', 268275), step=1000, key="lsa_start_widget", help="The UK LSA limits how much tax-free cash you can take across your lifetime. Max is £268,275.")
         
         st.write("---")
@@ -630,7 +630,7 @@ with st.sidebar:
     with st.expander("6. Market Assumptions", expanded=False):
         sim_model_index = get_val('sim_model_index', 0)
         if sim_model_index >= len(sim_models): sim_model_index = 0
-        sim_model = st.selectbox("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
+        sim_model = st.radio("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
         
         equity_allocation_pct = st.slider("Portfolio Equity Allocation (Stocks vs Bonds/Cash)", 0.0, 100.0, get_val('equity_allocation_pct', 100.0), 5.0, key="equity_allocation_pct_widget", help="100% means fully invested in stocks. 60% means 60% stocks and 40% bonds/cash.")
         
