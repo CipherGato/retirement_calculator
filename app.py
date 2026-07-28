@@ -157,7 +157,7 @@ def gross_up_for_tax(net_needed, existing_gross, tax_inflation_factor=1.0):
     return high
 
 # --- Core Simulation ---
-def simulate_scenario(inputs, market_returns):
+def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_returns=None):
     years = inputs['end_age'] - inputs['current_age'] + 1
     age = inputs['current_age']
     
@@ -181,8 +181,24 @@ def simulate_scenario(inputs, market_returns):
     results = []
     
     for i in range(years):
-        inflation_factor = (1 + inputs['inflation_rate']) ** i
-        tax_inflation_factor = (1 + inputs['tax_band_inflation']) ** i
+        if inflation_returns is not None:
+            inflation_factor = np.prod(1 + inflation_returns[:i]) if i > 0 else 1.0
+            
+            tax_rates = inflation_returns * inputs.get('tax_band_match', 1.0)
+            tax_inflation_factor = np.prod(1 + tax_rates[:i]) if i > 0 else 1.0
+            
+            db_cap = inputs.get('db_inflation_cap', 0.025)
+            db_rates = np.minimum(inflation_returns, db_cap)
+            db_inflation_factor = np.prod(1 + db_rates[:i]) if i > 0 else 1.0
+            
+            sp_floor = inputs.get('sp_inflation_floor', 0.025)
+            sp_rates = np.maximum(inflation_returns, sp_floor)
+            sp_inflation_factor = np.prod(1 + sp_rates[:i]) if i > 0 else 1.0
+        else:
+            inflation_factor = (1 + inputs['inflation_rate']) ** i
+            tax_inflation_factor = (1 + inputs['tax_band_inflation']) ** i
+            db_inflation_factor = (1 + inputs.get('db_inflation', inputs['inflation_rate'])) ** i
+            sp_inflation_factor = (1 + inputs.get('sp_inflation', inputs['inflation_rate'])) ** i
         
         spending_points = inputs.get('spending_points', [])
         base_target_net = 50000 # Fallback
@@ -198,8 +214,6 @@ def simulate_scenario(inputs, market_returns):
 
         target_net = base_target_net * inflation_factor
         
-        db_inflation_factor = (1 + inputs.get('db_inflation', inputs['inflation_rate'])) ** i
-        sp_inflation_factor = (1 + inputs.get('sp_inflation', inputs['inflation_rate'])) ** i
         db_income = inputs['db_pension'] * db_inflation_factor if age >= inputs['db_age'] else 0
         state_pension = inputs['state_pension'] * sp_inflation_factor if age >= inputs['state_pension_age'] else 0
         
@@ -231,7 +245,11 @@ def simulate_scenario(inputs, market_returns):
         k401_available = age >= inputs['k401_access_age']
         
         ret = market_returns[i]
-        cash_ret = inputs.get('cash_interest', 0.03)
+        if cash_returns is not None:
+            cash_ret = cash_returns[i]
+        else:
+            cash_ret = inputs.get('cash_interest', 0.03)
+            
         equity_alloc = inputs.get('equity_allocation', 1.0)
         
         # Blended return: (Equities * Equity_Alloc) + (Bonds/Cash * (1 - Equity_Alloc))
@@ -523,7 +541,10 @@ def simulate_scenario(inputs, market_returns):
             'GIA Balance': pots['GIA'],
             '401k Balance (GBP)': pots['US_401k'],
             'DC Pension Balance': pots['DC_Pension'],
-            'Total Pot': total_pot
+            'Total Pot': total_pot,
+            'Total Pot Real': total_pot / inflation_factor if inflation_factor > 0 else 0,
+            'Inflation Factor': inflation_factor,
+            'Cash Yield': cash_ret
         })
         
         age += 1
@@ -541,7 +562,7 @@ with st.sidebar:
         current_age = st.number_input("Current Age", min_value=18, max_value=99, value=get_val('current_age', 55), key="current_age_widget", help="Your current age.")
         end_age = st.number_input("End Age (Life Expectancy)", min_value=50, max_value=120, value=get_val('end_age', 95), key="end_age_widget", help="The age you expect to live until. Used to calculate the total simulation length.")
         
-    with st.expander("2. Income Goals & Economy", expanded=False):
+    with st.expander("2. Income Goals & Economy", expanded=True):
         st.write("Target Net Income (Today's £) by Age")
         st.caption("Define your spending phases. The simulator automatically inflates these targets over time. Add as many phases as you like.")
         default_spending = [{"From Age": 55, "Target Net (£)": 50000}, {"From Age": 75, "Target Net (£)": 35000}]
@@ -556,11 +577,23 @@ with st.sidebar:
                 pass
         
         st.write("---")
-        inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
-        inflation_rate = inflation_rate_pct / 100.0
+        use_hist_inflation = st.checkbox("Use Historical UK Inflation & Interest Rates", value=get_val('use_hist_inflation', False), key="use_hist_inflation_widget", help="Links inflation and Bank of England base rates directly to the historical year being simulated (only works with historical market models).")
         
-        tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen (as in reality).")
-        tax_band_inflation = tax_band_inflation_pct / 100.0
+        if use_hist_inflation:
+            st.info("Inflation and Cash/Bond Yields will perfectly mirror historical UK rates for the simulated years.")
+            inflation_rate_pct = get_val('inflation_rate_pct', 2.5)
+            inflation_rate = inflation_rate_pct / 100.0
+            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', 100.0), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
+            tax_band_match = tax_band_match_pct / 100.0
+            # For the baseline deterministic path when historical mode is active:
+            tax_band_inflation = inflation_rate * tax_band_match
+            tax_band_inflation_pct = tax_band_inflation * 100.0
+        else:
+            inflation_rate_pct = st.slider("General Inflation Rate (%)", 0.0, 10.0, get_val('inflation_rate_pct', 2.5), 0.1, key="inflation_rate_pct_widget", help="Assumed annual increase in the cost of goods and services.")
+            inflation_rate = inflation_rate_pct / 100.0
+            tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen (as in reality).")
+            tax_band_inflation = tax_band_inflation_pct / 100.0
+            tax_band_match = 1.0
         
         usd_gbp_rate = st.number_input("USD to GBP Exchange Rate", min_value=0.01, max_value=5.0, value=get_val('usd_gbp_rate', 0.75), step=0.01, key="usd_gbp_rate_widget", help="Exchange rate for converting your US 401k to GBP.")
         
@@ -599,7 +632,7 @@ with st.sidebar:
         ss_isa_start = st.number_input("Stocks & Shares ISA (£)", min_value=0, value=get_val('ss_isa_start', 0), step=10000, key="ss_isa_start_widget", help="Investments in a tax-free Stocks & Shares ISA.")
         gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 0), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
         
-    with st.expander("6. Market Assumptions", expanded=False):
+    with st.expander("6. Market Assumptions", expanded=True):
         sim_model_index = get_val('sim_model_index', 0)
         if sim_model_index >= len(sim_models): sim_model_index = 0
         sim_model = st.selectbox("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
@@ -627,8 +660,12 @@ with st.sidebar:
         market_mean = market_mean_pct / 100.0
         market_vol = market_vol_pct / 100.0
         
-        cash_interest_pct = st.slider("Cash / Bond Yield Rate (%)", 0.0, 10.0, get_val('cash_interest_pct', 3.0), 0.1, key="cash_interest_pct_widget", help="Yield rate applied to Cash Savings, Cash ISAs, and the non-equity portion of your investment portfolio.")
-        cash_interest = cash_interest_pct / 100.0
+        if use_hist_inflation:
+            cash_interest_pct = get_val('cash_interest_pct', 3.0)
+            cash_interest = cash_interest_pct / 100.0
+        else:
+            cash_interest_pct = st.slider("Cash / Bond Yield Rate (%)", 0.0, 10.0, get_val('cash_interest_pct', 3.0), 0.1, key="cash_interest_pct_widget", help="Yield rate applied to Cash Savings, Cash ISAs, and the non-equity portion of your investment portfolio.")
+            cash_interest = cash_interest_pct / 100.0
         
     with st.expander("7. Drawdown Strategy", expanded=True):
         drawdown_options = [
@@ -659,6 +696,8 @@ st.session_state.cfg = {
     'db_pension': db_pension,
     'db_age': db_age,
     'db_lump_sum': db_lump_sum,
+    'use_hist_inflation': use_hist_inflation,
+    'tax_band_match': tax_band_match,
     'state_pension_inflation_pct': state_pension_inflation_pct,
     'db_pension_inflation_pct': db_pension_inflation_pct,
     'savings_start': savings_start,
@@ -706,6 +745,8 @@ inputs = {
     'db_pension': db_pension,
     'db_age': db_age,
     'db_lump_sum': db_lump_sum,
+    'use_hist_inflation': use_hist_inflation,
+    'tax_band_match': tax_band_match,
     'sp_inflation': state_pension_inflation_pct / 100.0,
     'db_inflation': db_pension_inflation_pct / 100.0,
     'savings_start': savings_start,
@@ -747,6 +788,30 @@ with tab_sim:
             0.1665, 0.0553, -0.2928, 0.2846, 0.1444, -0.0319, 0.1174, 0.2019, 0.0137, 0.01, 
             0.1595, 0.125, -0.0945, 0.1769, -0.0896, 0.1805, 0.0034, 0.0735
         ])
+
+        HISTORICAL_INFLATION_UK_1928_2023 = np.array([
+            -0.003, -0.009, -0.028, -0.043, -0.026, -0.021, 0.0, 0.007, 0.007, 0.034, 0.016, 0.028,
+            0.168, 0.108, 0.071, 0.034, 0.027, 0.028, 0.031, 0.07, 0.077, 0.028, 0.031, 0.091, 0.092,
+            0.031, 0.018, 0.045, 0.049, 0.037, 0.03, 0.006, 0.01, 0.034, 0.043, 0.02, 0.033, 0.048,
+            0.039, 0.025, 0.047, 0.054, 0.064, 0.094, 0.071, 0.092, 0.16, 0.242, 0.165, 0.158, 0.083,
+            0.134, 0.18, 0.119, 0.086, 0.046, 0.05, 0.061, 0.034, 0.042, 0.049, 0.078, 0.095, 0.059,
+            0.037, 0.016, 0.024, 0.035, 0.024, 0.031, 0.034, 0.015, 0.03, 0.018, 0.017, 0.029, 0.03,
+            0.028, 0.032, 0.043, 0.04, -0.005, 0.046, 0.052, 0.032, 0.03, 0.024, 0.01, 0.018, 0.036,
+            0.033, 0.026, 0.015, 0.041, 0.116, 0.097
+        ])
+
+        HISTORICAL_CASH_UK_1928_2023 = np.array([
+            0.045, 0.05, 0.03, 0.06, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02,
+            0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02,
+            0.02, 0.02, 0.02, 0.025, 0.04, 0.035, 0.03, 0.045, 0.055, 0.07,
+            0.04, 0.04, 0.05, 0.06, 0.045, 0.04, 0.07, 0.06, 0.07, 0.08,
+            0.07, 0.08, 0.07, 0.05, 0.09, 0.13, 0.115, 0.1125, 0.1425, 0.07,
+            0.125, 0.17, 0.14, 0.1437, 0.1, 0.0906, 0.095, 0.1138, 0.1087, 0.0838,
+            0.1288, 0.1487, 0.1388, 0.1037, 0.0688, 0.0537, 0.0612, 0.0638, 0.0594, 0.0725,
+            0.0625, 0.055, 0.06, 0.04, 0.04, 0.0375, 0.0475, 0.045, 0.05, 0.055,
+            0.02, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.0025, 0.005,
+            0.0075, 0.0075, 0.001, 0.0025, 0.035, 0.0525,
+        ])
         
         if sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
             hist_mean = np.prod(1 + HISTORICAL_RETURNS_SP500) ** (1 / len(HISTORICAL_RETURNS_SP500)) - 1
@@ -764,18 +829,27 @@ with tab_sim:
         final_pots = []
         
         for sim in range(sim_count):
+            inf_returns = None
+            cash_returns = None
             if sim_model == "Configurable Flat Return":
                 returns = np.full(years, market_mean)
             elif sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
                 start_idx = sim
                 returns = np.array([HISTORICAL_RETURNS_SP500[(start_idx + i) % len(HISTORICAL_RETURNS_SP500)] for i in range(years)])
+                if use_hist_inflation:
+                    inf_returns = np.array([HISTORICAL_INFLATION_UK_1928_2023[(start_idx + i) % len(HISTORICAL_INFLATION_UK_1928_2023)] for i in range(years)])
+                    cash_returns = np.array([HISTORICAL_CASH_UK_1928_2023[(start_idx + i) % len(HISTORICAL_CASH_UK_1928_2023)] for i in range(years)])
             elif sim_model == "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)":
                 start_idx = sim
                 returns = np.array([HISTORICAL_RETURNS_FTSE[(start_idx + i) % len(HISTORICAL_RETURNS_FTSE)] for i in range(years)])
+                if use_hist_inflation:
+                    inf_start_idx = start_idx + 58
+                    inf_returns = np.array([HISTORICAL_INFLATION_UK_1928_2023[(inf_start_idx + i) % len(HISTORICAL_INFLATION_UK_1928_2023)] for i in range(years)])
+                    cash_returns = np.array([HISTORICAL_CASH_UK_1928_2023[(inf_start_idx + i) % len(HISTORICAL_CASH_UK_1928_2023)] for i in range(years)])
             else:
                 returns = np.random.normal(market_mean, market_vol, years)
                 
-            df = simulate_scenario(inputs, returns)
+            df = simulate_scenario(inputs, returns, inf_returns, cash_returns)
             df['Simulation'] = sim
             all_results.append(df)
             
@@ -787,19 +861,18 @@ with tab_sim:
         df_all = pd.concat(all_results)
         failure_rate = ((sim_count - success_count) / sim_count) * 100
         
-        final_inflation_factor = (1 + inputs['inflation_rate']) ** years
-        final_pots_real = [p / final_inflation_factor for p in final_pots]
+        final_pots_real = [df[df['Age'] == df['Age'].max()]['Total Pot Real'].iloc[0] for df in all_results]
         
         p10 = np.percentile(final_pots_real, 10)
         p50 = np.percentile(final_pots_real, 50)
         p90 = np.percentile(final_pots_real, 90)
         
         ages = df_all['Age'].unique()
-        p10_series = df_all.groupby('Age')['Total Pot'].quantile(0.10).values
-        p25_series = df_all.groupby('Age')['Total Pot'].quantile(0.25).values
-        p50_series = df_all.groupby('Age')['Total Pot'].quantile(0.50).values
-        p75_series = df_all.groupby('Age')['Total Pot'].quantile(0.75).values
-        p90_series = df_all.groupby('Age')['Total Pot'].quantile(0.90).values
+        p10_series = df_all.groupby('Age')['Total Pot Real'].quantile(0.10).values
+        p25_series = df_all.groupby('Age')['Total Pot Real'].quantile(0.25).values
+        p50_series = df_all.groupby('Age')['Total Pot Real'].quantile(0.50).values
+        p75_series = df_all.groupby('Age')['Total Pot Real'].quantile(0.75).values
+        p90_series = df_all.groupby('Age')['Total Pot Real'].quantile(0.90).values
         
     st.subheader("Monte Carlo Simulation Results")
     
@@ -858,7 +931,7 @@ with tab_sim:
         else:
             name = f"Simulation {sim}"
         fig.add_trace(go.Scatter(
-            x=df_sim['Age'], y=df_sim['Total Pot'], mode='lines+markers', name=name, customdata=np.full(len(df_sim), sim),
+            x=df_sim['Age'], y=df_sim['Total Pot Real'], mode='lines+markers', name=name, customdata=np.full(len(df_sim), sim),
             line=dict(color='rgba(0,0,255,0.05)' if sim_count > 50 else 'rgba(0,0,255,0.1)'), 
             marker=dict(size=12, opacity=0),
             showlegend=False
@@ -867,7 +940,7 @@ with tab_sim:
     # FIX #9: Use a distinct sentinel (-999) for the deterministic path so clicking it works
     DETERMINISTIC_SENTINEL = -999
     fig.add_trace(go.Scatter(
-        x=df_median['Age'], y=df_median['Total Pot'], mode='lines+markers', name='Deterministic Path (Constant Return)',
+        x=df_median['Age'], y=df_median['Total Pot Real'], mode='lines+markers', name='Deterministic Path (Constant Return)',
         customdata=np.full(len(df_median), DETERMINISTIC_SENTINEL), line=dict(color='red', width=3),
         marker=dict(size=1, opacity=0)
     ))
@@ -878,7 +951,9 @@ with tab_sim:
     )
     
     fig.update_layout(
-        title='Total Pot Balance Over Time (Probability Cone + Clickable Paths)', xaxis_title='Age', yaxis_title='Total Pot (£)',
+        title="Monte Carlo Projected Wealth (in Today's Money)",
+        xaxis_title="Age",
+        yaxis_title="Total Portfolio Value (£ Real)",
         yaxis_tickformat='£,.0f', clickmode='event+select', hovermode='closest'
     )
     
@@ -946,6 +1021,8 @@ with tab_sim:
                 start_year = 1986 + int(sim_to_inspect)
                 x_labels = [f"Age {a} ({start_year + i})" for i, a in enumerate(df_to_show['Age'])]
             
+        annual_inflation = df_to_show['Inflation Factor'].pct_change().shift(-1).ffill()
+        
         fig_ret.add_trace(go.Bar(
             x=x_labels, y=df_to_show['Stock Market Return'], name='Stock Market (Raw)', marker_color='rgba(150, 150, 150, 0.4)'
         ))
@@ -953,136 +1030,96 @@ with tab_sim:
             x=x_labels, y=df_to_show['Blended Portfolio Return'], name='Your Blended Portfolio', marker_color=['#00CC96' if r >= 0 else '#EF553B' for r in df_to_show['Blended Portfolio Return']]
         ))
         fig_ret.update_layout(
-            title='Raw Stock Market vs Your Blended Portfolio', xaxis_title='Age (and Year)', yaxis_title='Return (%)',
+            title='Market Returns', xaxis_title='Age (and Year)', yaxis_title='Return Rate (%)',
             yaxis_tickformat='.1%', barmode='group', legend=dict(orientation="h", y=-0.2)
         )
         st.plotly_chart(fig_ret, use_container_width=True)
+        
+        fig_econ = go.Figure()
+        fig_econ.add_trace(go.Scatter(
+            x=x_labels, y=annual_inflation, mode='lines+markers', name='Inflation Rate', line=dict(color='rgba(255, 165, 0, 1)', width=3, dash='dot'), marker=dict(size=6)
+        ))
+        if 'Cash Yield' in df_to_show.columns:
+            fig_econ.add_trace(go.Scatter(
+                x=x_labels, y=df_to_show['Cash Yield'], mode='lines', name='BoE Base Rate (Cash Yield)', line=dict(color='blue', width=2)
+            ))
+        fig_econ.update_layout(
+            title='Inflation & Interest Rates', xaxis_title='Age (and Year)', yaxis_title='Rate (%)',
+            yaxis_tickformat='.1%', legend=dict(orientation="h", y=-0.2)
+        )
+        st.plotly_chart(fig_econ, use_container_width=True)
     
     st.write("---")
     
     fig_bal = go.Figure()
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Savings Balance'], mode='lines', stackgroup='one', name='Savings (Cash)'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Cash ISA Balance'], mode='lines', stackgroup='one', name='Cash ISA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['S&S ISA Balance'], mode='lines', stackgroup='one', name='S&S ISA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['GIA Balance'], mode='lines', stackgroup='one', name='GIA'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['401k Balance (GBP)'], mode='lines', stackgroup='one', name='US 401k'))
-    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['DC Pension Balance'], mode='lines', stackgroup='one', name='DC Pension'))
+    
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Savings Balance'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='Savings (Cash)'))
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Cash ISA Balance'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='Cash ISA'))
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['S&S ISA Balance'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='S&S ISA'))
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['GIA Balance'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='GIA'))
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['401k Balance (GBP)'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='US 401k'))
+    fig_bal.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['DC Pension Balance'] / df_to_show['Inflation Factor'], mode='lines', stackgroup='one', name='DC Pension'))
     fig_bal.update_layout(
-        title='Remaining Pot Balances Over Time', xaxis_title='Age', yaxis_title='Balance (£)',
+        title="Remaining Pot Balances Over Time (in Today's Money)", xaxis_title='Age', yaxis_title='Balance (£ Real)',
         yaxis_tickformat='£,.0f', legend=dict(orientation="h", y=-0.2)
     )
     st.plotly_chart(fig_bal, use_container_width=True)
     
-    format_dict = {col: "£{:,.0f}" for col in df_to_show.columns if col not in ['Age', 'Simulation', 'Stock Market Return', 'Blended Portfolio Return']}
+    format_dict = {col: "£{:,.0f}" for col in df_to_show.columns if col not in ['Age', 'Simulation', 'Stock Market Return', 'Blended Portfolio Return', 'Inflation Factor', 'Cash Yield']}
     format_dict['Stock Market Return'] = "{:.2%}"
     format_dict['Blended Portfolio Return'] = "{:.2%}"
+    format_dict['Cash Yield'] = "{:.2%}"
+    format_dict['Inflation Factor'] = "{:.2f}x"
     st.dataframe(df_to_show.drop(columns=['Simulation'], errors='ignore').style.format(format_dict))
 
 with tab_help:
     st.header("How to use this Simulator")
-    st.markdown("""
+    st.markdown('''
     Welcome to the Scottish Retirement Simulator. This tool mathematically models your exact lifetime tax burden (specifically for Scotland), sequence-of-returns risk, and drawdown strategy.
 
-    ### 1. The 'Retirement Smile' (Income Goals)
-    People typically spend more in their early, active retirement years (travel, hobbies) and less later in life. Both of these targets are expressed in **Today's Money**; the simulator will automatically adjust your actual required withdrawals upwards every year to account for inflation.
-    * **Target Net Income Active Years (Today's £)**: The spending money you want in your pocket after all taxes are paid during your active years.
-    * **Active Years End Age**: The age you expect to slow down. The simulator will automatically drop your target income after this age.
-    * **Target Net Income Later Years (Today's £)**: The spending money you want in your pocket after all taxes are paid during your later years.
+    ### 1. Personal Details
+    * **Current Age** & **End Age**: Defines the total length of your retirement simulation.
 
-    ### 2. Market Assumptions & Strategy
-    * **Portfolio Equity Allocation**: A 100% allocation means your 401k, Pensions, and ISAs are fully exposed to the volatile Stock Market. A 60% allocation means 60% is in Stocks, and 40% is shielded in safe Cash/Bonds (earning the Cash Yield rate you select).
-    * **Fiscal Drag (Tax Band Inflation)**: If you set this lower than General Inflation, the Scottish tax brackets won't keep up with your income needs, meaning you will quietly pay more and more tax over time (fiscal drag). Note: the £100k Personal Allowance taper threshold is always frozen (matching real UK policy since 2010).
+    ### 2. Income Goals & Economy
+    * **Target Net Income (Today's £)**: The spending money you want in your pocket *after* all taxes are paid. The simulator will automatically adjust your required withdrawals upwards every year to account for inflation. You can set different targets for different phases of retirement (e.g., active years vs later years).
+    * **Use Historical UK Inflation & Interest Rates**: If checked (and you are using a Historical Rolling market model), this perfectly links UK historical inflation and the Bank of England Base Rate to the exact year of the simulation sequence (e.g. 1970s stagflation paired with 1970s interest rates).
+    * **General Inflation Rate**: The flat assumed annual increase in the cost of living (if not using historical rates).
+    * **Tax Bracket Inflation Match / Tax Bracket Inflation (%) (Fiscal Drag)**: How much the Scottish tax bands inflate relative to general inflation. If set to less than 100% (or lower than general inflation), you will suffer "fiscal drag" (paying more tax over time as brackets stagnate). Note: the £100k Personal Allowance taper threshold is always frozen.
+    * **USD to GBP Rate**: Used to convert your US 401(k) balance.
 
-    ### 3. Simulation Models
-    * **Normal Distribution (Bell Curve)**: Uses a standard random walk based on the Mean and Volatility you provide. This is a standard Monte Carlo.
-    * **Historical Rolling Sequence (US S&P 500 1928-2023)**: Uses 96 years of ACTUAL US S&P 500 total returns (including dividends). This perfectly models **"Sequence of Returns Risk"** because it tests your retirement against the Great Depression, the 1970s stagflation, the Dot-Com crash, and the 2008 Financial Crisis in exact chronological order.
-    * **Historical Rolling Sequence (UK FTSE All-Share 1986-2023)**: Uses 38 years of historical UK FTSE All-Share index returns (price change plus an estimated 3.5% historical average dividend yield) from 1986 through 2023. Models UK-specific sequence of returns risk including the Dot-Com bubble and the Global Financial Crisis.
+    ### 3. Guaranteed Income
+    * **UK State Pension**: Automatically taxed. You can set a custom **State Pension Inflation** rate (defaults to general inflation).
+    * **Defined Benefit Pension**: Automatically taxed. You can set a **DB Pension Inflation** rate (typically capped at 2.5% in reality).
+    * **DB Tax-Free Lump Sum**: Consumes your Lump Sum Allowance (LSA) and is paid tax-free at your DB start age.
 
-    ### 4. Drawdown Strategies Detailed Breakdown
-    * **1. Tax-Optimised (Cap at Basic Rate, Protect Cash)** *(Recommended Default)*:
-      - **Tax Optimization:** Calculates your exact headroom up to the Scottish Higher Rate threshold (£43,662 gross). It draws from taxable pensions up to £43,662, then switches to tax-free ISAs/GIA for any remaining net income need, completely dodging the 42% Scottish tax bracket.
-      - **Pension Priority:** Prioritizes UK DC Pension first (especially when 25% Tax-Free UFPLS is active to maximize net cash per pound of gross bracket).
-      - **Downturn Protection:** In market down years, it halts equity sales and burns Cash Savings/Cash ISA down to your specified **Cash Buffer** (e.g. 2 years of income) to mitigate Sequence of Returns Risk.
-    * **2. Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)**:
-      - **Tax Optimization & Protection:** Exactly identical tax-capping (£43,662 limit) and downturn protection (Cash Buffer) as Option 1.
-      - **Pension Priority:** Explicitly draws from your **US 401(k) FIRST** across all tax bands (0% PA, 19%, 20%, 21%), zeroing out your 401(k) as early as possible.
-      - **Why use this:** Ideal for US ex-pats / UK residents who want to eliminate foreign tax reporting complexity (IRS Form 1040/1040-NR & FBAR filings) early in retirement.
-    * **3. Dynamic Cash Buffer (Equities in Up years, Cash in Down years)**:
-      - **Up Years:** Draws from equity investments (401k -> S&S ISA -> GIA -> DC Pension).
-      - **Down Years:** Halts equity sales completely and draws from Cash Savings and Cash ISA to give your stock portfolio time to recover from market crashes.
-    * **4. Equities First (Preserve Cash completely)**:
-      - Sells equity investments first (401k -> S&S ISA -> GIA -> DC Pension) regardless of market conditions, preserving cash reserves indefinitely.
-    * **5. Cash First (Burn Cash immediately)**:
-      - Exhausts all liquid Cash Savings and Cash ISAs immediately in Year 1 before touching any invested pensions or ISAs.
+    ### 4. Pensions & Allowances
+    * **DC Pension & US 401(k)**: You can choose how you take tax-free cash from your DC pension (either taking 25% tax-free on every withdrawal via UFPLS, or sweeping £20k/yr into a S&S ISA via Phased PCLS).
+    * **Lump Sum Allowance (LSA)**: Capped at £268,275 across your lifetime. Once exhausted, all pension withdrawals become 100% taxable.
 
-    ### 5. Reading the Graphs
-    * **The Probability Cone**: The large green shaded areas represent the statistical likelihood of your wealth over time. The inner shade is the 25th-75th percentile. The outer shade is the 10th-90th percentile. If the cone approaches the red **Failure Zone**, there is a risk of running out of money.
-    * **Clickable Paths**: Click any of the blue paths in the top graph to load that exact simulation into the deep-dive charts below.
-    * **Deep Dive Charts**: When you select a path, the bottom charts show you EXACTLY where your income came from each year, what your pot balances were, and how your Blended Portfolio Return compared to the Raw Stock Market Return.
+    ### 5. Savings & Investments
+    * **Cash Savings**: Earns interest at the Cash/Bond Yield rate. Interest is subject to the Personal Savings Allowance (PSA) and marginal income tax.
+    * **Cash ISA & Stocks & Shares ISA**: 100% tax-free growth and withdrawals.
+    * **General Investment Account (GIA)**: Capital gains are tracked exactly, with the £3,000 annual CGT exemption automatically applied before 20% higher-rate CGT.
 
-    ### 6. Tax & Allowance Model Details
-    The simulator models the following taxes and allowances on each pot type:
+    ### 6. Market Assumptions
+    * **Simulation Models**: 
+      - *Normal Distribution (Bell Curve)*: Monte Carlo simulations based on your input mean/volatility.
+      - *Configurable Flat Return*: A fully deterministic, 0% volatility projection for baseline testing.
+      - *Historical Rolling Sequence (S&P 500 or FTSE All-Share)*: Uses actual historical market returns to perfectly model Sequence of Returns Risk.
+    * **Portfolio Equity Allocation**: For example, a 60% allocation means 60% is in Stocks (experiencing market returns), and 40% is in safe Cash/Bonds (earning the Cash Yield rate).
+    * **Cash Yield**: The interest rate earned by your Cash Savings, Cash ISA, and the bond portion of your portfolio. (Hidden/dynamic if "Use Historical UK Inflation" is checked).
+    * **Cash Buffer**: How many years of income to protect in cash during market downturns before being forced to sell equities (used in Tax-Optimised drawdown strategies).
 
-    #### 6.1 Scottish Income Tax (2025-26 Rates)
-    All taxable pension income (DC Pension, 401k, DB, State Pension) is taxed using **2025-26 Scottish Income Tax** rates. The bands and rates used are:
-    | Band | Width | Rate |
-    |---|---|---|
-    | Personal Allowance | £12,570 | 0% |
-    | Starter Rate | £2,306 | 19% |
-    | Basic Rate | £11,685 | 20% |
-    | Intermediate Rate | £17,101 | 21% |
-    | Higher Rate | £31,338 | 42% |
-    | Advanced Rate | £50,140 | 45% |
-    | Top Rate | Remainder | 48% |
+    ### 7. Drawdown Strategy
+    * **1. Tax-Optimised (Cap at Basic Rate, Protect Cash)** *(Recommended)*: Calculates headroom up to the Scottish Higher Rate threshold (£43,662). Draws taxable pensions up to this limit, then switches to tax-free ISAs/GIA to dodge the 42% bracket. Protects cash during market crashes (using Cash Buffer).
+    * **2. Tax-Optimised (401k First)**: Same as #1, but explicitly targets the US 401(k) first to eliminate foreign tax reporting complexity.
+    * **3. Dynamic Cash Buffer**: Sells equities in up-years, but burns cash in down-years to let stocks recover.
+    * **4. Equities First**: Aggressively sells investments first, preserving cash indefinitely.
+    * **5. Cash First**: Exhausts all cash before touching investments.
 
-    * **Personal Allowance Taper:** Income above £100,000 reduces the PA by £1 for every £2. PA is fully lost at £125,140. The £100k threshold is **frozen** (never inflation-adjusted), matching real UK policy since 2010.
-    * **Retirees do not pay National Insurance** on pension withdrawals — this is correctly modelled.
-    * **Fiscal Drag:** If Tax Bracket Inflation is set lower than General Inflation, the bands erode in real terms and you pay more tax over time.
-    * The simulator uses a **binary search** to "gross up" your net income target, finding the exact gross withdrawal needed to deliver a specific net amount at your current marginal rate.
+    ### 8. Reading the Graphs
+    * **The Probability Cone**: The green shaded areas represent the statistical likelihood of your wealth. If the cone hits the red **Failure Zone**, there is a risk of running out of money.
+    * **Clickable Paths**: Click any blue path in the top graph to load that exact simulation into the deep-dive charts below.
+    * **Deep Dive Charts**: Shows exactly where your income came from each year, pot balances over time, and your Blended Portfolio Return vs the Raw Stock Market Return (including the exact historical Bank of England Cash Yields and Inflation).
+    ''')
 
-    #### 6.2 DC Pension & US 401(k)
-    * **Growth inside the wrapper** is tax-free.
-    * **Withdrawals** are taxed as earned income via the Scottish bands above.
-    * **UFPLS (Uncrystallised Funds Pension Lump Sum):** 25% of each withdrawal is tax-free (deducted from your Lump Sum Allowance). The remaining 75% is taxed as income.
-    * **Phased PCLS (Pension Commencement Lump Sum):** Each year, up to £20,000 is transferred tax-free from your DC Pension to your S&S ISA, deducted from your LSA. The remaining pension stays uncrystallised.
-    * **Lump Sum Allowance (LSA):** Capped at £268,275 across your lifetime. Once exhausted, all pension withdrawals become 100% taxable.
-
-    #### 6.3 Cash Savings
-    * **Interest** is calculated annually at the Cash/Bond Yield rate.
-    * **Personal Savings Allowance (PSA):**
-      - Basic/Intermediate rate taxpayers (income ≤ £43,662): **£1,000** tax-free.
-      - Higher rate taxpayers (income £43,662 – £75,000): **£500** tax-free.
-      - Advanced/Top rate taxpayers (income > £75,000): **£0** (no PSA).
-    * Interest above the PSA is taxed at your **marginal Scottish income tax rate** (calculated using your guaranteed income as the base). Tax is deducted directly from the pot.
-    * **Withdrawals** from savings are tax-free (the capital has already been taxed as earnings).
-
-    #### 6.4 General Investment Account (GIA)
-    * **Growth** inside the GIA is **not taxed** until you sell (unrealised gains).
-    * **Capital Gains Tax (CGT)** is applied **only on the gain portion** of each sale:
-      - The simulator tracks your **cost basis** (original investment). When you sell, the gain is `sale × (1 − cost_basis ÷ pot_value)`.
-      - The first **£3,000** of realised gains per year is covered by the **Annual CGT Exemption** (2024-25 onwards).
-      - Gains above £3,000 are taxed at **20%** (higher rate CGT).
-      - If you don't sell, no CGT is triggered — gains are deferred.
-    * **Withdrawals** are reduced by the CGT owed, so the net amount reaching your pocket is lower than the gross sale.
-
-    #### 6.5 ISAs (Cash ISA & Stocks & Shares ISA)
-    * **All growth and withdrawals are completely tax-free.** No income tax, no CGT, no reporting.
-
-    #### 6.6 Guaranteed Income (DB Pension & State Pension)
-    * Taxed as earned income via Scottish bands.
-    * **DB Tax-Free Lump Sum (PCLS):** If a lump sum is specified, it is paid out at your DB Start Age. It consumes your Lump Sum Allowance (LSA). If the lump sum exceeds your remaining LSA, the excess is taxed at your marginal income tax rate. The net amount is deposited into your Cash Savings.
-    * **State Pension Inflation** defaults to General Inflation (conservative vs the Triple Lock).
-    * **DB Pension Inflation** defaults to min(General Inflation, 2.5%), reflecting typical scheme caps.
-    * Both can be independently adjusted in the sidebar.
-
-    #### 6.7 Total Tax Paid
-    The "Total Tax Paid" column in the results table includes:
-    * Scottish Income Tax on all taxable income (pensions, DB, State Pension)
-    * Tax on savings interest (above the PSA, at marginal rate)
-    * Capital Gains Tax on GIA sales (above the £3,000 annual exemption)
-    
-    ### 7. Simulation Models
-    * **Normal Distribution (Bell Curve)**: Runs Monte Carlo simulations using a random normal distribution based on the Expected Return and Volatility inputs.
-    * **Configurable Flat Return**: Runs a single, fully deterministic projection using the specified Flat Return with 0% volatility. Useful for mathematical baseline testing.
-    * **Historical Rolling Sequence**: Uses actual historical market return sequences (S&P 500 or FTSE All-Share) to model real-world Sequence of Returns Risk.
-    """)
