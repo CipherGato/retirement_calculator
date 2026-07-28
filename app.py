@@ -706,6 +706,8 @@ with st.sidebar:
         cash_buffer_years = get_val('cash_buffer_years', 2)
         if drawdown_strategy in ["Tax-Optimised (Cap at Basic Rate, Protect Cash)", "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"]:
             cash_buffer_years = st.slider("Cash Buffer (Years of Income)", 0, 10, cash_buffer_years, 1, key="cash_buffer_years_widget", help="How many years of income to protect in Cash Savings / Cash ISA before being forced into the 42% tax bracket.")
+            
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
 
 st.session_state.cfg = {
     'current_age': current_age,
