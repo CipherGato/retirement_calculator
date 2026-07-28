@@ -701,7 +701,7 @@ with st.sidebar:
         saved_index = get_val('drawdown_strategy_index', 0)
         if saved_index >= len(drawdown_options): saved_index = 0
         
-        drawdown_strategy = st.selectbox("Drawdown Strategy", drawdown_options, index=saved_index, key="drawdown_strategy_widget", help="Tax-Optimised mathematically blends pots to avoid the 42% tax bracket. Other options rigidly follow a sequence.")
+        drawdown_strategy = st.radio("Drawdown Strategy", drawdown_options, index=saved_index, key="drawdown_strategy_widget", help="Tax-Optimised mathematically blends pots to avoid the 42% tax bracket. Other options rigidly follow a sequence.")
         
         cash_buffer_years = get_val('cash_buffer_years', 2)
         if drawdown_strategy in ["Tax-Optimised (Cap at Basic Rate, Protect Cash)", "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"]:
