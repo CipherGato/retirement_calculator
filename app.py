@@ -679,7 +679,8 @@ with st.sidebar:
             st.info("Inflation and Cash/Bond Yields will perfectly mirror historical UK rates for the simulated years.")
             inflation_rate_pct = get_val('inflation_rate_pct', 2.5)
             inflation_rate = inflation_rate_pct / 100.0
-            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', 100.0), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
+            fallback_match_pct = get_val('tax_band_match', 1.0) * 100.0
+            tax_band_match_pct = st.slider("Tax Bracket Inflation Match (%)", 0.0, 150.0, get_val('tax_band_match_pct', fallback_match_pct), 5.0, key="tax_band_match_pct_widget", help="If 100%, Scottish tax brackets rise exactly with historical inflation. If 50%, they only rise by half the inflation amount (creating fiscal drag).")
             tax_band_match = tax_band_match_pct / 100.0
             tax_band_inflation = inflation_rate * tax_band_match
             tax_band_inflation_pct = tax_band_inflation * 100.0
@@ -691,7 +692,8 @@ with st.sidebar:
             inflation_rate = inflation_rate_pct / 100.0
             tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen.")
             tax_band_inflation = tax_band_inflation_pct / 100.0
-            tax_band_match_pct = get_val('tax_band_match_pct', 100.0)
+            fallback_match_pct = get_val('tax_band_match', 1.0) * 100.0
+            tax_band_match_pct = get_val('tax_band_match_pct', fallback_match_pct)
             tax_band_match = 1.0
             
             cash_interest_pct = st.slider("Cash / Bond Yield Rate (%)", 0.0, 10.0, get_val('cash_interest_pct', 3.0), 0.1, key="cash_interest_pct_widget", help="Yield rate applied to Cash Savings, Cash ISAs, and the non-equity portion of your investment portfolio.")
