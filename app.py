@@ -640,16 +640,20 @@ with st.sidebar:
         if sim_model == "Normal Distribution (Bell Curve)":
             market_mean_pct = st.slider("Expected Stock Market Return (%)", 0.0, 15.0, market_mean_pct, 0.1, key="market_mean_pct_widget", help="Expected average annual return of the stock market.")
             market_vol_pct = st.slider("Stock Market Volatility (%)", 0.0, 30.0, market_vol_pct, 0.5, key="market_vol_pct_widget", help="Expected volatility (standard deviation) of the stock market.")
-            sim_count = st.number_input("Monte Carlo Simulations", min_value=1, max_value=1000, value=get_val('sim_count', 500), key="sim_count_widget", help="Number of random lifetimes to simulate.")
+            mc_sim_count = st.number_input("Monte Carlo Simulations", min_value=1, max_value=1000, value=get_val('mc_sim_count', 500), key="mc_sim_count_widget", help="Number of random lifetimes to simulate.")
+            sim_count = mc_sim_count
         elif sim_model == "Configurable Flat Return":
             market_mean_pct = st.slider("Flat Stock Market Return (%)", 0.0, 15.0, market_mean_pct, 0.1, key="market_mean_pct_widget", help="Expected flat annual return of the stock market.")
             market_vol_pct = 0.0
+            mc_sim_count = get_val('mc_sim_count', 500)
             sim_count = 1
         elif sim_model == "Historical Rolling Sequence (US S&P 500 1928-2023)":
             st.info("Using exactly 96 retirements, each starting in a different historical year (1928 to 2023). Stock Return sliders disabled.")
+            mc_sim_count = get_val('mc_sim_count', 500)
             sim_count = 96
         else:
             st.info("Using exactly 38 retirements, each starting in a different historical year (1986 to 2023). Stock Return sliders disabled.")
+            mc_sim_count = get_val('mc_sim_count', 500)
             sim_count = 38
             
         market_mean = market_mean_pct / 100.0
@@ -731,18 +735,14 @@ st.session_state.cfg = {
     'market_mean_pct': market_mean_pct,
     'market_vol_pct': market_vol_pct,
     'cash_interest_pct': cash_interest_pct,
-    'sim_count': sim_count,
+    'mc_sim_count': mc_sim_count,
     'drawdown_strategy_index': drawdown_options.index(drawdown_strategy),
     'dc_tax_free_index': dc_options.index(dc_tax_free_method),
     'lsa_start': lsa_start,
     'cash_buffer_years': cash_buffer_years
 }
 
-# Save to internal session state
-import time
-with open("debug_log.txt", "a") as f: f.write(f"\n--- RUN {time.time()} ---\nCFG: {st.session_state.cfg}\nNEW: {st.session_state.cfg}\n")
-if st.session_state.cfg != st.session_state.cfg:
-    st.session_state.cfg = st.session_state.cfg
+
 
 
 
