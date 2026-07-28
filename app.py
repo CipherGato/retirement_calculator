@@ -562,7 +562,7 @@ with st.sidebar:
         current_age = st.number_input("Current Age", min_value=18, max_value=99, value=get_val('current_age', 55), key="current_age_widget", help="Your current age.")
         end_age = st.number_input("End Age (Life Expectancy)", min_value=50, max_value=120, value=get_val('end_age', 95), key="end_age_widget", help="The age you expect to live until. Used to calculate the total simulation length.")
         
-    with st.expander("2. Income Goals", expanded=True):
+    with st.expander("2. Income Goals", expanded=False):
         st.write("Target Net Income (Today's £) by Age")
         st.caption("Define your spending phases. The simulator automatically inflates these targets over time. Add as many phases as you like.")
         default_spending = [{"From Age": 55, "Target Net (£)": 50000}, {"From Age": 75, "Target Net (£)": 35000}]
@@ -612,7 +612,7 @@ with st.sidebar:
         ss_isa_start = st.number_input("Stocks & Shares ISA (£)", min_value=0, value=get_val('ss_isa_start', 0), step=10000, key="ss_isa_start_widget", help="Investments in a tax-free Stocks & Shares ISA.")
         gia_start = st.number_input("General Investment Account (£)", min_value=0, value=get_val('gia_start', 0), step=5000, key="gia_start_widget", help="General Investment Account. Capital gains taxed at 20% above the £3,000 annual CGT exemption.")
         
-    with st.expander("6. Market Assumptions", expanded=True):
+    with st.expander("6. Market Assumptions", expanded=False):
         sim_model_index = get_val('sim_model_index', 0)
         if sim_model_index >= len(sim_models): sim_model_index = 0
         sim_model = st.selectbox("Simulation Model", sim_models, index=sim_model_index, key="sim_model_widget", help="Bell Curve uses random math. Historical Rolling uses real sequence returns.")
@@ -671,7 +671,7 @@ with st.sidebar:
         st.write("---")
         usd_gbp_rate = st.number_input("USD to GBP Exchange Rate", min_value=0.01, max_value=5.0, value=get_val('usd_gbp_rate', 0.75), step=0.01, key="usd_gbp_rate_widget", help="Exchange rate for converting your US 401k to GBP.")
         
-    with st.expander("7. Drawdown Strategy", expanded=True):
+    with st.expander("7. Drawdown Strategy", expanded=False):
         drawdown_options = [
             "Tax-Optimised (Cap at Basic Rate, Protect Cash)",
             "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)",
