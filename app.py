@@ -562,7 +562,7 @@ with st.sidebar:
         current_age = st.number_input("Current Age", min_value=18, max_value=99, value=get_val('current_age', 55), key="current_age_widget", help="Your current age.")
         end_age = st.number_input("End Age (Life Expectancy)", min_value=50, max_value=120, value=get_val('end_age', 95), key="end_age_widget", help="The age you expect to live until. Used to calculate the total simulation length.")
         
-    with st.expander("2. Income Goals & Economy", expanded=True):
+    with st.expander("2. Income Goals", expanded=True):
         st.write("Target Net Income (Today's £) by Age")
         st.caption("Define your spending phases. The simulator automatically inflates these targets over time. Add as many phases as you like.")
         default_spending = [{"From Age": 55, "Target Net (£)": 50000}, {"From Age": 75, "Target Net (£)": 35000}]
@@ -1084,7 +1084,7 @@ with tab_help:
     ### 1. Personal Details
     * **Current Age** & **End Age**: Defines the total length of your retirement simulation.
 
-    ### 2. Retirement Spending
+    ### 2. Income Goals
     * **Target Net Income (Today's £)**: The spending money you want in your pocket *after* all taxes are paid. The simulator will automatically adjust your required withdrawals upwards every year to account for inflation. You can set different targets for different phases of retirement (e.g., active years vs later years).
 
     ### 3. Guaranteed Income
