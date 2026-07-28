@@ -585,8 +585,16 @@ with st.sidebar:
         db_lump_sum = st.number_input("DB Tax-Free Lump Sum (PCLS) (£)", min_value=0, value=get_val('db_lump_sum', 0), step=5000, key="db_lump_sum_widget", help="Tax-free lump sum received at DB start age. Uses up your Lump Sum Allowance.")
         
         st.write("---")
-        state_pension_inflation_pct = st.slider("State Pension Inflation (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', get_val('inflation_rate_pct', 2.5)), 0.1, key="state_pension_inflation_pct_widget", help="Annual increase in the UK State Pension. The Triple Lock guarantees the higher of inflation, average earnings growth, or 2.5%. Defaults to general inflation (conservative).")
-        db_pension_inflation_pct = st.slider("DB Pension Inflation (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(get_val('inflation_rate_pct', 2.5), 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Annual increase in your Defined Benefit pension. Many schemes cap increases at CPI or 2.5%, whichever is lower. Defaults to min(inflation, 2.5%).")
+        _sim_model_idx = get_val('sim_model_index', 0)
+        _sim_model_name = sim_models[_sim_model_idx] if _sim_model_idx < len(sim_models) else sim_models[0]
+        _is_hist_inf = ("Historical Rolling Sequence" in _sim_model_name) and get_val('use_hist_inflation', False)
+        
+        if _is_hist_inf:
+            state_pension_inflation_pct = st.slider("State Pension Inflation Floor (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', get_val('inflation_rate_pct', 2.5)), 0.1, key="state_pension_inflation_pct_widget", help="Because Historical UK Inflation is enabled, the State Pension will perfectly mirror historical inflation rates, but this slider acts as the absolute floor (the Triple Lock guarantee).")
+            db_pension_inflation_pct = st.slider("DB Pension Inflation Cap (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(get_val('inflation_rate_pct', 2.5), 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Because Historical UK Inflation is enabled, the DB Pension will perfectly mirror historical inflation rates, but this slider acts as the absolute cap.")
+        else:
+            state_pension_inflation_pct = st.slider("State Pension Inflation (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', get_val('inflation_rate_pct', 2.5)), 0.1, key="state_pension_inflation_pct_widget", help="Annual increase in the UK State Pension. The Triple Lock guarantees the higher of inflation, average earnings growth, or 2.5%. Defaults to general inflation (conservative).")
+            db_pension_inflation_pct = st.slider("DB Pension Inflation (%)", 0.0, 10.0, get_val('db_pension_inflation_pct', min(get_val('inflation_rate_pct', 2.5), 2.5)), 0.1, key="db_pension_inflation_pct_widget", help="Annual increase in your Defined Benefit pension. Many schemes cap increases at CPI or 2.5%, whichever is lower. Defaults to min(inflation, 2.5%).")
         
     with st.expander("4. Pensions & Allowances", expanded=False):
         dc_start = st.number_input("Defined Contribution Pension (£)", min_value=0, value=get_val('dc_start', 0), step=10000, key="dc_start_widget", help="Defined Contribution Pension. Handled according to the strategy chosen below.")
