@@ -585,9 +585,16 @@ with st.sidebar:
         db_lump_sum = st.number_input("DB Tax-Free Lump Sum (PCLS) (£)", min_value=0, value=get_val('db_lump_sum', 0), step=5000, key="db_lump_sum_widget", help="Tax-free lump sum received at DB start age. Uses up your Lump Sum Allowance.")
         
         st.write("---")
-        _sim_model_idx = get_val('sim_model_index', 0)
-        _sim_model_name = sim_models[_sim_model_idx] if _sim_model_idx < len(sim_models) else sim_models[0]
-        _is_hist_inf = ("Historical Rolling Sequence" in _sim_model_name) and get_val('use_hist_inflation', False)
+        _sim_model_val = st.session_state.get('sim_model_widget')
+        if _sim_model_val is None:
+            _sim_model_idx = get_val('sim_model_index', 0)
+            _sim_model_val = sim_models[_sim_model_idx] if _sim_model_idx < len(sim_models) else sim_models[0]
+            
+        _hist_checkbox_val = st.session_state.get('use_hist_inflation_widget')
+        if _hist_checkbox_val is None:
+            _hist_checkbox_val = get_val('use_hist_inflation', False)
+            
+        _is_hist_inf = ("Historical Rolling Sequence" in _sim_model_val) and _hist_checkbox_val
         
         if _is_hist_inf:
             state_pension_inflation_pct = st.slider("State Pension Inflation Floor (%)", 0.0, 10.0, get_val('state_pension_inflation_pct', get_val('inflation_rate_pct', 2.5)), 0.1, key="state_pension_inflation_pct_widget", help="Because Historical UK Inflation is enabled, the State Pension will perfectly mirror historical inflation rates, but this slider acts as the absolute floor (the Triple Lock guarantee).")
