@@ -203,14 +203,25 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
         spending_points = inputs.get('spending_points', [])
         base_target_net = 50000 # Fallback
         if spending_points:
-            sorted_pts = sorted(spending_points, key=lambda x: x.get('From Age', 0), reverse=True)
-            for pt in sorted_pts:
-                if age >= pt.get('From Age', 0):
-                    base_target_net = pt.get('Target Net (£)', 0)
-                    break
-            # If age is before all points, use the first point chronologically (which is the last in reverse sort)
-            if base_target_net == 0 and sorted_pts:
-                base_target_net = sorted_pts[-1].get('Target Net (£)', 0)
+            valid_pts = []
+            for pt in spending_points:
+                try:
+                    f_age = pt.get('From Age')
+                    t_net = pt.get('Target Net (£)')
+                    if f_age is not None and t_net is not None:
+                        valid_pts.append({'From Age': int(f_age), 'Target Net (£)': float(t_net)})
+                except (ValueError, TypeError):
+                    pass
+                    
+            if valid_pts:
+                sorted_pts = sorted(valid_pts, key=lambda x: x.get('From Age', 0), reverse=True)
+                for pt in sorted_pts:
+                    if age >= pt.get('From Age', 0):
+                        base_target_net = pt.get('Target Net (£)', 0)
+                        break
+                # If age is before all points, use the first point chronologically (which is the last in reverse sort)
+                if base_target_net == 0 and sorted_pts:
+                    base_target_net = sorted_pts[-1].get('Target Net (£)', 0)
 
         target_net = base_target_net * inflation_factor
         
@@ -566,13 +577,29 @@ with st.sidebar:
         st.write("Target Net Income (Today's £) by Age")
         st.caption("Define your spending phases. The simulator automatically inflates these targets over time. Add as many phases as you like.")
         default_spending = [{"From Age": 55, "Target Net (£)": 50000}, {"From Age": 75, "Target Net (£)": 35000}]
-        spending_points = st.data_editor(get_val('spending_points', default_spending), num_rows="dynamic", key="spending_points_widget", use_container_width=True, hide_index=True)
+        spending_points = st.data_editor(
+            get_val('spending_points', default_spending), 
+            num_rows="dynamic", 
+            key="spending_points_widget", 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "From Age": st.column_config.NumberColumn("From Age", min_value=18, max_value=120, step=1, required=True),
+                "Target Net (£)": st.column_config.NumberColumn("Target Net (£)", min_value=0, step=1000, format="£%d", required=True)
+            }
+        )
         
         if spending_points:
             try:
-                first_target = float(spending_points[0].get("Target Net (£)", 0))
-                gross_first = gross_up_for_tax(first_target, 0, 1.0)
-                st.markdown(f"<p style='margin-top:-5px; margin-bottom:15px; font-size:14px; color:gray;'>First phase equivalent to Gross Salary: <b>£{gross_first:,.0f}</b> <br/><i>(Note: Retirees do not pay National Insurance on pension income)</i></p>", unsafe_allow_html=True)
+                first_target = None
+                for pt in spending_points:
+                    if pt.get("Target Net (£)") is not None:
+                        first_target = float(pt.get("Target Net (£)"))
+                        break
+                        
+                if first_target is not None:
+                    gross_first = gross_up_for_tax(first_target, 0, 1.0)
+                    st.markdown(f"<p style='margin-top:-5px; margin-bottom:15px; font-size:14px; color:gray;'>First phase equivalent to Gross Salary: <b>£{gross_first:,.0f}</b> <br/><i>(Note: Retirees do not pay National Insurance on pension income)</i></p>", unsafe_allow_html=True)
             except Exception:
                 pass
         
