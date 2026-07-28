@@ -1070,6 +1070,7 @@ with tab_help:
 
     #### 6.6 Guaranteed Income (DB Pension & State Pension)
     * Taxed as earned income via Scottish bands.
+    * **DB Tax-Free Lump Sum (PCLS):** If a lump sum is specified, it is paid out at your DB Start Age. It consumes your Lump Sum Allowance (LSA). If the lump sum exceeds your remaining LSA, the excess is taxed at your marginal income tax rate. The net amount is deposited into your Cash Savings.
     * **State Pension Inflation** defaults to General Inflation (conservative vs the Triple Lock).
     * **DB Pension Inflation** defaults to min(General Inflation, 2.5%), reflecting typical scheme caps.
     * Both can be independently adjusted in the sidebar.
@@ -1079,4 +1080,9 @@ with tab_help:
     * Scottish Income Tax on all taxable income (pensions, DB, State Pension)
     * Tax on savings interest (above the PSA, at marginal rate)
     * Capital Gains Tax on GIA sales (above the £3,000 annual exemption)
+    
+    ### 7. Simulation Models
+    * **Normal Distribution (Bell Curve)**: Runs Monte Carlo simulations using a random normal distribution based on the Expected Return and Volatility inputs.
+    * **Configurable Flat Return**: Runs a single, fully deterministic projection using the specified Flat Return with 0% volatility. Useful for mathematical baseline testing.
+    * **Historical Rolling Sequence**: Uses actual historical market return sequences (S&P 500 or FTSE All-Share) to model real-world Sequence of Returns Risk.
     """)
