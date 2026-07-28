@@ -691,6 +691,7 @@ with st.sidebar:
             inflation_rate = inflation_rate_pct / 100.0
             tax_band_inflation_pct = st.slider("Tax Bracket Inflation (%) (Fiscal Drag)", 0.0, 10.0, get_val('tax_band_inflation_pct', 0.0), 0.1, key="tax_band_inflation_pct_widget", help="Assumed annual increase in Scottish tax thresholds. If this is lower than inflation, you will suffer 'fiscal drag' and pay more tax over time. Note: the £100k PA taper threshold is always frozen.")
             tax_band_inflation = tax_band_inflation_pct / 100.0
+            tax_band_match_pct = get_val('tax_band_match_pct', 100.0)
             tax_band_match = 1.0
             
             cash_interest_pct = st.slider("Cash / Bond Yield Rate (%)", 0.0, 10.0, get_val('cash_interest_pct', 3.0), 0.1, key="cash_interest_pct_widget", help="Yield rate applied to Cash Savings, Cash ISAs, and the non-equity portion of your investment portfolio.")
@@ -736,6 +737,7 @@ st.session_state.cfg = {
     'db_lump_sum': db_lump_sum,
     'use_hist_inflation': use_hist_inflation,
     'tax_band_match': tax_band_match,
+    'tax_band_match_pct': tax_band_match_pct if 'tax_band_match_pct' in locals() else 100.0,
     'state_pension_inflation_pct': state_pension_inflation_pct,
     'db_pension_inflation_pct': db_pension_inflation_pct,
     'savings_start': savings_start,
