@@ -31,10 +31,12 @@ if 'cfg' not in st.session_state:
 sim_models = ["Normal Distribution (Bell Curve)", "Configurable Flat Return", "Historical Rolling Sequence (US S&P 500 1928-2023)", "Historical Rolling Sequence (UK FTSE All-Share 1986-2023)"]
 
 drawdown_options = [
-    "Equities First",
-    "Equities First (401k First)",
     "Tax-Optimised (Cap at Basic Rate, Protect Cash)",
-    "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)"
+    "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)",
+    "Dynamic Cash Buffer (Equities in Up years, Cash in Down years)",
+    "Equities First (Preserve Cash completely)",
+    "Cash First (Burn Cash immediately)",
+    "Maximise Inheritance (Drain Pensions to preserve ISAs)"
 ]
 
 dc_options = [
@@ -519,10 +521,21 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
                     ('US_401k', 'taxable'), ('SS_ISA', 'tax_free'), ('GIA', 'gia'),
                     ('DC_Pension', 'taxable'), ('Savings', 'tax_free'), ('Cash_ISA', 'tax_free')
                 ]
-            else: # "Cash First (Burn Cash immediately)"
+            elif strategy == "Cash First (Burn Cash immediately)":
                 draw_order = [
-                    ('Savings', 'tax_free'), ('Cash_ISA', 'tax_free'), ('US_401k', 'taxable'),
-                    ('SS_ISA', 'tax_free'), ('GIA', 'gia'), ('DC_Pension', 'taxable')
+                    ('Savings', 'tax_free'), ('Cash_ISA', 'tax_free'), ('DC_Pension', 'taxable'),
+                    ('US_401k', 'taxable'), ('SS_ISA', 'tax_free'), ('GIA', 'gia')
+                ]
+            elif strategy == "Maximise Inheritance (Drain Pensions to preserve ISAs)":
+                draw_order = [
+                    ('DC_Pension', 'taxable'), ('US_401k', 'taxable'), ('Savings', 'tax_free'),
+                    ('Cash_ISA', 'tax_free'), ('GIA', 'gia'), ('SS_ISA', 'tax_free')
+                ]
+            else:
+                # Default fallback
+                draw_order = [
+                    ('DC_Pension', 'taxable'), ('US_401k', 'taxable'), ('Savings', 'tax_free'),
+                    ('Cash_ISA', 'tax_free'), ('GIA', 'gia'), ('SS_ISA', 'tax_free')
                 ]
                 
             for pot_name, tax_type in draw_order:
@@ -736,13 +749,6 @@ with st.sidebar:
         usd_gbp_rate = st.number_input("USD to GBP Exchange Rate", min_value=0.01, max_value=5.0, value=get_val('usd_gbp_rate', 0.75), step=0.01, key="usd_gbp_rate_widget", help="Exchange rate for converting your US 401k to GBP.")
         
     with st.expander("7. Drawdown Strategy", expanded=False):
-        drawdown_options = [
-            "Tax-Optimised (Cap at Basic Rate, Protect Cash)",
-            "Tax-Optimised (401k First, Cap at Basic Rate, Protect Cash)",
-            "Dynamic Cash Buffer (Equities in Up years, Cash in Down years)",
-            "Equities First (Preserve Cash completely)",
-            "Cash First (Burn Cash immediately)"
-        ]
         _current_dd_val = st.session_state.get("drawdown_strategy_widget")
         if _current_dd_val is not None and _current_dd_val in drawdown_options:
             saved_index = drawdown_options.index(_current_dd_val)
