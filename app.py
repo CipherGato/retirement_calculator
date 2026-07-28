@@ -1109,7 +1109,10 @@ with tab_help:
     * **Portfolio Equity Allocation**: For example, a 60% allocation means 60% is in Stocks (experiencing market returns), and 40% is in safe Cash/Bonds.
     * **Use Historical UK Inflation & Interest Rates**: (Visible for Historical models). Perfectly links UK historical inflation and the Bank of England Base Rate to the exact year of the simulation sequence.
     * **General Inflation Rate**: The flat assumed annual increase in the cost of living (if not using historical rates).
-    * **Tax Bracket Inflation Match / Tax Bracket Inflation (%) (Fiscal Drag)**: How much the Scottish tax bands inflate relative to general inflation. If set to less than 100% (or lower than general inflation), you will suffer "fiscal drag". Note: the £100k PA taper threshold is always frozen.
+    * **Tax Bracket Inflation Match / Tax Bracket Inflation (%) (Fiscal Drag)**: 
+      - *Historical Mode (Match %)*: How much the Scottish tax bands inflate relative to the historical inflation rate (e.g., 100% perfectly matches inflation; 50% means bands only rise by half the inflation amount).
+      - *Standard Mode (Flat %)*: The fixed annual percentage by which tax bands increase. If this is lower than your General Inflation Rate, you will suffer "fiscal drag" (paying more tax over time as brackets stagnate). 
+      - *Note*: The £100k Personal Allowance taper threshold is always frozen by law.
     * **Cash Yield**: The interest rate earned by your Cash Savings, Cash ISA, and the bond portion of your portfolio. (Hidden/dynamic if "Use Historical UK Inflation" is checked).
     * **Cash Buffer**: How many years of income to protect in cash during market downturns before being forced to sell equities.
     * **USD to GBP Rate**: Used to convert your US 401(k) balance.
