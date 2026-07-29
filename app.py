@@ -254,7 +254,17 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
         state_pension = inputs['state_pension'] * sp_inflation_factor if age >= inputs['state_pension_age'] else 0
         
         guaranteed_gross = db_income + state_pension + current_annuity_income
-        guaranteed_net = guaranteed_gross - calculate_scottish_tax(guaranteed_gross, tax_inflation_factor)
+        total_guaranteed_tax = calculate_scottish_tax(guaranteed_gross, tax_inflation_factor)
+        guaranteed_net = guaranteed_gross - total_guaranteed_tax
+        
+        if guaranteed_gross > 0:
+            prop_state_db = (db_income + state_pension) / guaranteed_gross
+            prop_annuity = current_annuity_income / guaranteed_gross
+            db_state_net = guaranteed_net * prop_state_db
+            annuity_net = guaranteed_net * prop_annuity
+        else:
+            db_state_net = 0.0
+            annuity_net = 0.0
         
         shortfall_net = max(0, target_net - guaranteed_net)
         
@@ -574,7 +584,8 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
             'Target Net Income': target_net,
             'Total Net Achieved': total_net_achieved,
             'Unfunded Shortfall': shortfall_net,
-            'Funded From: Guaranteed': guaranteed_net,
+            'Funded From: Guaranteed': db_state_net,
+            'Funded From: Annuity': annuity_net,
             'Funded From: Savings': withdrawals['Savings'],
             'Funded From: Cash ISA': withdrawals['Cash_ISA'],
             'Funded From: S&S ISA': withdrawals['SS_ISA'],
@@ -1112,6 +1123,7 @@ with tab_sim:
     with col1:
         fig_inc = go.Figure()
         fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Guaranteed'], mode='lines', stackgroup='one', name='Guaranteed (DB + State)'))
+        fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Annuity'], mode='lines', stackgroup='one', name='Annuity Income'))
         fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Savings'], mode='lines', stackgroup='one', name='Savings (Cash)'))
         fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: Cash ISA'], mode='lines', stackgroup='one', name='Cash ISA'))
         fig_inc.add_trace(go.Scatter(x=df_to_show['Age'], y=df_to_show['Funded From: S&S ISA'], mode='lines', stackgroup='one', name='S&S ISA'))
