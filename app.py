@@ -232,7 +232,7 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
         target_net = base_target_net * inflation_factor
         
         # Check for annuity purchase
-        if age == inputs.get('annuity_purchase_age', 75) and inputs.get('annuity_purchase_pct', 0) > 0 and pots['DC_Pension'] > 0:
+        if age == int(inputs.get('annuity_purchase_age', 75)) and inputs.get('annuity_purchase_pct', 0) > 0 and pots['DC_Pension'] > 0:
             pct = inputs['annuity_purchase_pct'] / 100.0
             amount_used = pots['DC_Pension'] * pct
             pots['DC_Pension'] -= amount_used
@@ -682,10 +682,21 @@ with st.sidebar:
         
         st.write("---")
         st.markdown("**Annuity Purchase (from DC Pension)**")
-        annuity_purchase_pct = st.slider("Percentage of DC Pension to Convert to Annuity (%)", 0, 100, get_val('annuity_purchase_pct', 0), 5, key="annuity_purchase_pct_widget", help="What percentage of your DC Pension pot will be used to buy a lifetime annuity?")
-        annuity_purchase_age = st.number_input("Annuity Purchase Age", min_value=50, max_value=99, value=get_val('annuity_purchase_age', 75), key="annuity_purchase_age_widget", help="Age at which the annuity is purchased.")
-        annuity_rate_pct = st.slider("Annuity Rate (%)", 1.0, 15.0, get_val('annuity_rate_pct', 6.0), 0.1, key="annuity_rate_pct_widget", help="The guaranteed annual payout rate (e.g. 6% means £6k a year per £100k purchased).")
-        annuity_inflation_linked = st.checkbox("Annuity is Inflation Linked", value=get_val('annuity_inflation_linked', False), key="annuity_inflation_linked_widget", help="Does the annuity payout rise with inflation every year?")
+        _curr_pct = st.session_state.get('annuity_purchase_pct_widget')
+        _pct_val = _curr_pct if _curr_pct is not None else get_val('annuity_purchase_pct', 0)
+        annuity_purchase_pct = st.slider("Percentage of DC Pension to Convert to Annuity (%)", 0, 100, _pct_val, 5, key="annuity_purchase_pct_widget", help="What percentage of your DC Pension pot will be used to buy a lifetime annuity?")
+        
+        _curr_age = st.session_state.get('annuity_purchase_age_widget')
+        _age_val = _curr_age if _curr_age is not None else get_val('annuity_purchase_age', 75)
+        annuity_purchase_age = st.number_input("Annuity Purchase Age", min_value=50, max_value=99, value=int(_age_val), key="annuity_purchase_age_widget", help="Age at which the annuity is purchased.")
+        
+        _curr_rate = st.session_state.get('annuity_rate_pct_widget')
+        _rate_val = _curr_rate if _curr_rate is not None else get_val('annuity_rate_pct', 6.0)
+        annuity_rate_pct = st.slider("Annuity Rate (%)", 1.0, 15.0, float(_rate_val), 0.1, key="annuity_rate_pct_widget", help="The guaranteed annual payout rate (e.g. 6% means £6k a year per £100k purchased).")
+        
+        _curr_link = st.session_state.get('annuity_inflation_linked_widget')
+        _link_val = _curr_link if _curr_link is not None else get_val('annuity_inflation_linked', False)
+        annuity_inflation_linked = st.checkbox("Annuity is Inflation Linked", value=bool(_link_val), key="annuity_inflation_linked_widget", help="Does the annuity payout rise with inflation every year?")
         st.write("---")
         
         dc_options = [
