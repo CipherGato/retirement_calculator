@@ -182,6 +182,10 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
     
     results = []
     
+    annuity_income_base = 0.0
+    annuity_purchase_year = -1
+    
+
     for i in range(years):
         if inflation_returns is not None:
             inflation_factor = np.prod(1 + inflation_returns[:i]) if i > 0 else 1.0
@@ -227,10 +231,29 @@ def simulate_scenario(inputs, market_returns, inflation_returns=None, cash_retur
 
         target_net = base_target_net * inflation_factor
         
+        # Check for annuity purchase
+        if age == inputs.get('annuity_purchase_age', 75) and inputs.get('annuity_purchase_pct', 0) > 0 and pots['DC_Pension'] > 0:
+            pct = inputs['annuity_purchase_pct'] / 100.0
+            amount_used = pots['DC_Pension'] * pct
+            pots['DC_Pension'] -= amount_used
+            annuity_income_base = amount_used * (inputs.get('annuity_rate_pct', 6.0) / 100.0)
+            annuity_purchase_year = i
+            
+        current_annuity_income = 0.0
+        if annuity_income_base > 0:
+            if inputs.get('annuity_inflation_linked', False):
+                if inflation_returns is not None:
+                    ann_inf = np.prod(1 + inflation_returns[annuity_purchase_year:i]) if i > annuity_purchase_year else 1.0
+                else:
+                    ann_inf = (1 + inputs['inflation_rate']) ** (i - annuity_purchase_year) if i > annuity_purchase_year else 1.0
+                current_annuity_income = annuity_income_base * ann_inf
+            else:
+                current_annuity_income = annuity_income_base
+        
         db_income = inputs['db_pension'] * db_inflation_factor if age >= inputs['db_age'] else 0
         state_pension = inputs['state_pension'] * sp_inflation_factor if age >= inputs['state_pension_age'] else 0
         
-        guaranteed_gross = db_income + state_pension
+        guaranteed_gross = db_income + state_pension + current_annuity_income
         guaranteed_net = guaranteed_gross - calculate_scottish_tax(guaranteed_gross, tax_inflation_factor)
         
         shortfall_net = max(0, target_net - guaranteed_net)
@@ -646,6 +669,14 @@ with st.sidebar:
     with st.expander("4. Pensions & Allowances", expanded=False):
         dc_start = st.number_input("Defined Contribution Pension (£)", min_value=0, value=get_val('dc_start', 0), step=10000, key="dc_start_widget", help="Defined Contribution Pension. Handled according to the strategy chosen below.")
         
+        st.write("---")
+        st.markdown("**Annuity Purchase (from DC Pension)**")
+        annuity_purchase_pct = st.slider("Percentage of DC Pension to Convert to Annuity (%)", 0, 100, get_val('annuity_purchase_pct', 0), 5, key="annuity_purchase_pct_widget", help="What percentage of your DC Pension pot will be used to buy a lifetime annuity?")
+        annuity_purchase_age = st.number_input("Annuity Purchase Age", min_value=50, max_value=99, value=get_val('annuity_purchase_age', 75), key="annuity_purchase_age_widget", help="Age at which the annuity is purchased.")
+        annuity_rate_pct = st.slider("Annuity Rate (%)", 1.0, 15.0, get_val('annuity_rate_pct', 6.0), 0.1, key="annuity_rate_pct_widget", help="The guaranteed annual payout rate (e.g. 6% means £6k a year per £100k purchased).")
+        annuity_inflation_linked = st.checkbox("Annuity is Inflation Linked", value=get_val('annuity_inflation_linked', False), key="annuity_inflation_linked_widget", help="Does the annuity payout rise with inflation every year?")
+        st.write("---")
+        
         dc_options = [
             "100% Taxable (Already taken / Default)",
             "25% Tax-Free (UFPLS) on every withdrawal",
@@ -786,6 +817,10 @@ st.session_state.cfg = {
     'ss_isa_start': ss_isa_start,
     'gia_start': gia_start,
     'dc_start': dc_start,
+    'annuity_purchase_pct': annuity_purchase_pct,
+    'annuity_purchase_age': annuity_purchase_age,
+    'annuity_rate_pct': annuity_rate_pct,
+    'annuity_inflation_linked': annuity_inflation_linked,
     'k401_start_usd': k401_start_usd,
     'k401_access_age': k401_access_age,
     'sim_model_index': sim_models.index(sim_model),
