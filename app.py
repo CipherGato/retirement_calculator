@@ -697,6 +697,12 @@ with st.sidebar:
         _curr_link = st.session_state.get('annuity_inflation_linked_widget')
         _link_val = _curr_link if _curr_link is not None else get_val('annuity_inflation_linked', False)
         annuity_inflation_linked = st.checkbox("Annuity is Inflation Linked", value=bool(_link_val), key="annuity_inflation_linked_widget", help="Does the annuity payout rise with inflation every year?")
+        
+        if annuity_purchase_pct > 0:
+            purchase_est = dc_start * (annuity_purchase_pct / 100.0)
+            residual_est = dc_start - purchase_est
+            income_est = purchase_est * (annuity_rate_pct / 100.0)
+            st.info(f"**Current Pot Preview:**\n- Purchase Amount: **£{purchase_est:,.0f}**\n- Residual DC Pension: **£{residual_est:,.0f}**\n- Est. Annual Gross Income: **£{income_est:,.0f}**\n\n*(Note: Actual amounts at purchase age will vary based on intervening market growth and drawdowns.)*")
         st.write("---")
         
         dc_options = [
