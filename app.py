@@ -1209,7 +1209,7 @@ with tab_sim:
     format_dict['Blended Portfolio Return'] = "{:.2%}"
     format_dict['Cash Yield'] = "{:.2%}"
     format_dict['Inflation Factor'] = "{:.2f}x"
-    st.dataframe(df_to_show.drop(columns=['Simulation'], errors='ignore').style.format(format_dict))
+    st.dataframe(df_to_show.drop(columns=['Simulation'], errors='ignore').set_index('Age').style.format(format_dict))
 
 with tab_help:
     st.header("How to use this Simulator")
