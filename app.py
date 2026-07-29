@@ -617,6 +617,17 @@ with st.sidebar:
     st.title("Configuration")
     
     with st.expander("1. Personal Details", expanded=False):
+        if 'prev_current_age' not in st.session_state:
+            st.session_state.prev_current_age = get_val('current_age', 55)
+        
+        # If the widget value exists and has changed from our tracker
+        if 'current_age_widget' in st.session_state:
+            curr_w = st.session_state.current_age_widget
+            if curr_w != st.session_state.prev_current_age:
+                if st.session_state.get('annuity_purchase_age_widget') == st.session_state.prev_current_age:
+                    st.session_state.annuity_purchase_age_widget = curr_w
+                st.session_state.prev_current_age = curr_w
+                
         current_age = st.number_input("Current Age", min_value=18, max_value=99, value=get_val('current_age', 55), key="current_age_widget", help="Your current age.")
         end_age = st.number_input("End Age (Life Expectancy)", min_value=50, max_value=120, value=get_val('end_age', 95), key="end_age_widget", help="The age you expect to live until. Used to calculate the total simulation length.")
         
@@ -688,7 +699,7 @@ with st.sidebar:
         
         _curr_age = st.session_state.get('annuity_purchase_age_widget')
         _age_val = _curr_age if _curr_age is not None else get_val('annuity_purchase_age', current_age)
-        annuity_purchase_age = st.number_input("Annuity Purchase Age", min_value=50, max_value=99, value=int(_age_val), key="annuity_purchase_age_widget", help="Age at which the annuity is purchased.")
+        annuity_purchase_age = st.number_input("Annuity Purchase Age", min_value=18, max_value=99, value=int(_age_val), key="annuity_purchase_age_widget", help="Age at which the annuity is purchased.")
         
         _curr_rate = st.session_state.get('annuity_rate_pct_widget')
         _rate_val = _curr_rate if _curr_rate is not None else get_val('annuity_rate_pct', 6.0)
